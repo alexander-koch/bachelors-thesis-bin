@@ -39,11 +39,11 @@ fn parse_grammar(path: &str) -> Result<(), ParseError> {
         println!("{}", token);
     }
 
-    println!("Starting to parse!!");
-
     let mut parser = Parser::new(tokens.into_iter());
     let grammar = try!(parser.parse());
-    println!("{:?}", grammar);
+    for rule in grammar {
+        println!("{}", rule);
+    }
 
     Ok(())
 }

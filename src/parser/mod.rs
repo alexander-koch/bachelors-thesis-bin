@@ -1,11 +1,30 @@
 //! Syntax analysis.
 use std::iter::Peekable;
 use lexer::{Error, Position, Token, TokenType};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct Rule {
     pub head: String,
     pub body: Vec<(String, bool)>,
+}
+
+fn terminalize(s: &str, t: bool) -> String {
+    if t {
+        format!("\"{}\"", s)
+    } else {
+        s.to_owned()
+    }
+}
+
+impl fmt::Display for Rule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} -> {} .", self.head, self.body
+            .iter()
+            .map(|(s, t)| terminalize(s, *t))
+            .collect::<Vec<String>>()
+            .join(" "))
+    }
 }
 
 pub type Grammar = Vec<Rule>;
