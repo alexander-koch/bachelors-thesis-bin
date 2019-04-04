@@ -30,21 +30,22 @@ impl fmt::Display for Rule {
 pub type Grammar = Vec<Rule>;
 pub type ParsingResult<T> = ::std::result::Result<T, Error>;
 
-pub struct Parser<T: Iterator<Item = Token>> {
+/// Parser for the extended Backus-Naur form (EBNF)
+pub struct EBNFParser<T: Iterator<Item = Token>> {
     tokens: Peekable<T>,
     current: Token
 }
 
-impl<T: Iterator<Item = Token>> Parser<T> {
+impl<T: Iterator<Item = Token>> EBNFParser<T> {
     /// Creates a new parser based on an iterator of tokens.
-    pub fn new(it: T) -> Parser<T> {
+    pub fn new(it: T) -> EBNFParser<T> {
         let mut peek = it.peekable();
         let start = peek.next().unwrap_or(Token {
             typ: TokenType::Eof,
             value: None,
             position: Position::new(-1, -1),
         });
-        Parser {
+        EBNFParser {
             tokens: peek,
             current: start
         }

@@ -12,7 +12,7 @@ pub mod lexer;
 use lexer::Lexer;
 
 pub mod parser;
-use parser::{Parser, Grammar};
+use parser::{EBNFParser, Grammar};
 
 #[derive(Debug)]
 enum ParseError {
@@ -44,7 +44,7 @@ fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
         println!("{}", token);
     }
 
-    let mut parser = Parser::new(tokens.into_iter());
+    let mut parser = EBNFParser::new(tokens.into_iter());
     let grammar = try!(parser.parse());
     for (i, rule) in grammar.clone().iter().enumerate() {
         println!("{}. {}", i, rule);
@@ -229,7 +229,7 @@ impl EarleyParser {
 fn main() {
     env_logger::init();
 
-    let grammar = parse_grammar("grammar5.txt").ok().unwrap();
+    let grammar = parse_grammar("examples/grammar5.txt").ok().unwrap();
     let mut parser = EarleyParser::new(&grammar);
 
     let stdin = io::stdin();
