@@ -1,0 +1,10 @@
+ROOT = s .
+s = np vp .
+np = det n .
+vp = v pp .
+pp = p np .
+
+n = "cat" | "mat" .
+v = "sat" .
+p = "on" .
+det = "the" .

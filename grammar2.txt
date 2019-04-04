@@ -1,3 +1,4 @@
+ROOT = sum .
 sum = sum "+" product | sum "*" product | product .
 product = product "*" factor | product "/" factor | factor .
 factor = "(" sum ")" | number .

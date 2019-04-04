@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use lexer::{Error, Position, Token, TokenType};
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rule {
     pub head: String,
     pub body: Vec<(String, bool)>,

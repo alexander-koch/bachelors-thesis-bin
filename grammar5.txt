@@ -1,0 +1,8 @@
+ROOT = S .
+S = A B | C D | A T | C U | S S .
+T = S B .
+U = S D .
+A = "(" .
+B = ")" .
+C = "[" .
+D = "]" .
