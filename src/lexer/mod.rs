@@ -10,7 +10,7 @@ pub enum TokenType {
     Alternative,
     Assign,
     Dot,
-    Epsilon
+    Epsilon,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -120,7 +120,9 @@ impl<'a> Lexer<'a> {
     }
 
     fn is_ident(&mut self) -> bool {
-        self.current.map(|x| x.is_alphanumeric() || x == '_').unwrap_or(false)
+        self.current
+            .map(|x| x.is_alphanumeric() || x == '_')
+            .unwrap_or(false)
     }
 
     fn skip_space(&mut self) {
@@ -235,12 +237,12 @@ impl<'a> Lexer<'a> {
             Ok(Token {
                 typ: TokenType::Dot,
                 value: None,
-                position: position
+                position: position,
             })
         } else if self.is_space() {
             self.skip_space();
             self.next_token()
-        } else if self.curr_is('"') { 
+        } else if self.curr_is('"') {
             self.scan_terminal()
         } else if self.is_punctuation() {
             self.scan_punctuation()
@@ -257,9 +259,7 @@ impl<'a> Lexer<'a> {
 
         // Read all the tokens
         while self.cursor < self.data.len() {
-            let token = try!(self.next_token());
-            //println!("Current token {:?}", token);
-            tokens.push(token);
+            tokens.push(self.next_token()?);
         }
 
         Ok(tokens)

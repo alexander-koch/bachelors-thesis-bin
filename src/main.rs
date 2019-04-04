@@ -1,16 +1,12 @@
-
-use std::io;
-use std::fs::File;
-use std::io::{BufRead, Read};
 use std::collections::HashSet;
+use std::fs;
+use std::io;
+use std::io::BufRead;
 
-#[macro_use]
-extern crate log;
-extern crate env_logger;
+use log::{debug, trace};
 
 pub mod lexer;
 use lexer::Lexer;
-
 pub mod parser;
 use parser::{EBNFParser, Grammar};
 
@@ -33,19 +29,16 @@ impl From<lexer::Error> for ParseError {
 }
 
 fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
-    let mut file = File::open(path)?;
-    let mut content = String::new();
-    try!(file.read_to_string(&mut content));
-
+    let content = fs::read_to_string(path)?;
     let mut lexer = Lexer::new(&content);
-    let tokens = try!(lexer.run());
+    let tokens = lexer.run()?;
 
     for token in tokens.clone() {
         println!("{}", token);
     }
 
     let mut parser = EBNFParser::new(tokens.into_iter());
-    let grammar = try!(parser.parse());
+    let grammar = parser.parse()?;
     for (i, rule) in grammar.clone().iter().enumerate() {
         println!("{}. {}", i, rule);
     }
@@ -57,7 +50,7 @@ fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
 pub struct State {
     pub rule_index: usize,
     pub dot: usize,
-    pub start: usize
+    pub start: usize,
 }
 
 impl State {
@@ -65,7 +58,7 @@ impl State {
         State {
             rule_index: rule_index,
             dot: dot,
-            start: start
+            start: start,
         }
     }
 }
@@ -94,7 +87,7 @@ impl EarleyParser {
     }
 
     /// Returns a set of dotted rules that are of the form
-    /// 
+    ///
     /// B -> * zeta
     /// given a rule of the form
     /// A -> alpha * B beta
@@ -107,13 +100,13 @@ impl EarleyParser {
         for (i, rule) in self.grammar.iter().enumerate() {
             if &rule.head == token {
                 new_rules.insert(State::new(i, 0, start));
-            } 
+            }
         }
         new_rules
     }
 
     /// Increments the dotted rule, only if the current terminal symbol may be scanned
-    /// 
+    ///
     /// If the production is of the form
     /// A -> alpha * a beta
     /// and the current word matches a
@@ -129,7 +122,7 @@ impl EarleyParser {
     }
 
     /// Returns a set of completed rules
-    /// 
+    ///
     /// for each rule of the form
     /// A -> zeta *
     /// increment the rules of the form
@@ -143,7 +136,7 @@ impl EarleyParser {
             let rule = &self.grammar[s.rule_index];
             if !is_final_state(&self.grammar, s) && rule.body[s.dot].0 == base_rule.head {
                 rules.insert(State::new(s.rule_index, s.dot + 1, s.start));
-            }           
+            }
         }
         rules
     }
@@ -161,7 +154,7 @@ impl EarleyParser {
             } else {
                 // k+1
                 if let Some(state) = self.scan(state, &word) {
-                    self.states[self.cursor+1].insert(state);
+                    self.states[self.cursor + 1].insert(state);
                 }
                 None
             }
@@ -183,10 +176,16 @@ impl EarleyParser {
         }
 
         debug!("updates: {:?}", updates);
-        let required_updates = updates.difference(&self.states[self.cursor]).cloned().collect();
+        let required_updates = updates
+            .difference(&self.states[self.cursor])
+            .cloned()
+            .collect();
 
         // Update in original set
-        self.states[self.cursor] = self.states[self.cursor].union(&required_updates).cloned().collect();
+        self.states[self.cursor] = self.states[self.cursor]
+            .union(&required_updates)
+            .cloned()
+            .collect();
 
         // Perform next iteration
         if !updates.is_empty() {
@@ -195,16 +194,12 @@ impl EarleyParser {
     }
 
     pub fn analyze(&mut self, words: &Vec<String>) -> StateSetList {
-        self.states = vec![HashSet::new(); words.len()+1];
+        self.states = vec![HashSet::new(); words.len() + 1];
         self.states[0].insert(State::new(0, 0, 0));
 
-        for i in 0..(words.len()+1) {
+        for i in 0..(words.len() + 1) {
             self.cursor = i;
-            let word = if i < words.len() {
-                &words[i]
-            } else {
-                ""
-            };
+            let word = if i < words.len() { &words[i] } else { "" };
 
             println!("current word: {}", word);
 
@@ -234,7 +229,9 @@ fn main() {
 
     let stdin = io::stdin();
     for line in stdin.lock().lines() {
-        let words: Vec<String> = line.map(|x| x.split_whitespace().map(String::from).collect()).unwrap();
+        let words: Vec<String> = line
+            .map(|x| x.split_whitespace().map(String::from).collect())
+            .unwrap();
         println!("{:?}", words);
 
         let result = parser.accepts(&words);

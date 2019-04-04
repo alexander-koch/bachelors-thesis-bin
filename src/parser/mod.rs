@@ -1,7 +1,7 @@
 //! Syntax analysis.
-use std::iter::Peekable;
-use lexer::{Error, Position, Token, TokenType};
+use crate::lexer::{Error, Position, Token, TokenType};
 use std::fmt;
+use std::iter::Peekable;
 
 #[derive(Debug, Clone)]
 pub struct Rule {
@@ -19,11 +19,16 @@ fn terminalize(s: &str, t: bool) -> String {
 
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} -> {} .", self.head, self.body
-            .iter()
-            .map(|(s, t)| terminalize(s, *t))
-            .collect::<Vec<String>>()
-            .join(" "))
+        write!(
+            f,
+            "{} -> {} .",
+            self.head,
+            self.body
+                .iter()
+                .map(|(s, t)| terminalize(s, *t))
+                .collect::<Vec<String>>()
+                .join(" ")
+        )
     }
 }
 
@@ -33,7 +38,7 @@ pub type ParsingResult<T> = ::std::result::Result<T, Error>;
 /// Parser for the extended Backus-Naur form (EBNF)
 pub struct EBNFParser<T: Iterator<Item = Token>> {
     tokens: Peekable<T>,
-    current: Token
+    current: Token,
 }
 
 impl<T: Iterator<Item = Token>> EBNFParser<T> {
@@ -47,7 +52,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
         });
         EBNFParser {
             tokens: peek,
-            current: start
+            current: start,
         }
     }
 
@@ -96,8 +101,8 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     // a = "a" a | "a" .
     fn parse_rule(&mut self) -> ParsingResult<Vec<Rule>> {
         let name = self.get_current_value();
-        try!(self.expect_type(TokenType::Identifier));
-        try!(self.expect_type(TokenType::Assign));
+        self.expect_type(TokenType::Identifier)?;
+        self.expect_type(TokenType::Assign)?;
 
         let mut rules = Vec::new();
         let mut body = Vec::new();
@@ -108,12 +113,12 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                 TokenType::Alternative => {
                     rules.push(Rule {
                         head: name.clone(),
-                        body: body.clone()
+                        body: body.clone(),
                     });
                     body.clear()
-                },
+                }
                 TokenType::Dot => break,
-                _ => return Err(self.err("Expected Ident, Terminal or Dot".to_owned()))
+                _ => return Err(self.err("Expected Ident, Terminal or Dot".to_owned())),
             }
 
             self.bump()
@@ -132,7 +137,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     fn parse_rules(&mut self) -> ParsingResult<Vec<Rule>> {
         let mut rules = Vec::new();
         while self.current.typ != TokenType::Eof {
-            let mut rule = try!(self.parse_rule());
+            let mut rule = self.parse_rule()?;
             rules.append(&mut rule);
         }
         Ok(rules)
@@ -140,8 +145,8 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
 
     pub fn parse(&mut self) -> ParsingResult<Grammar> {
         //debug!("Parsing");
-        let rules = try!(self.parse_rules());
-        try!(self.expect_type(TokenType::Eof));
+        let rules = self.parse_rules()?;
+        self.expect_type(TokenType::Eof)?;
         Ok(rules)
     }
 }
