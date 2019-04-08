@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::io::BufRead;
 
 use log::{debug, trace};
+
+use rustyline::Editor;
+use rustyline::error::ReadlineError;
 
 pub mod lexer;
 use lexer::Lexer;
@@ -34,13 +36,13 @@ fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
     let tokens = lexer.run()?;
 
     for token in tokens.clone() {
-        println!("{}", token);
+        debug!("{}", token);
     }
 
     let mut parser = EBNFParser::new(tokens.into_iter());
     let grammar = parser.parse()?;
     for (i, rule) in grammar.clone().iter().enumerate() {
-        println!("{}. {}", i, rule);
+        debug!("{}. {}", i, rule);
     }
 
     Ok(grammar)
@@ -193,15 +195,15 @@ impl EarleyParser {
         }
     }
 
-    pub fn analyze(&mut self, words: &Vec<String>) -> StateSetList {
+    pub fn analyze(&mut self, words: &Vec<&str>) -> StateSetList {
         self.states = vec![HashSet::new(); words.len() + 1];
         self.states[0].insert(State::new(0, 0, 0));
 
         for i in 0..(words.len() + 1) {
             self.cursor = i;
-            let word = if i < words.len() { &words[i] } else { "" };
+            let word = if i < words.len() { words[i] } else { "" };
 
-            println!("current word: {}", word);
+            debug!("current word: {}", word);
 
             let set = self.states[i].clone();
             self.process_state_set(set, word);
@@ -210,16 +212,86 @@ impl EarleyParser {
         self.states.clone()
     }
 
-    pub fn accepts(&mut self, words: &Vec<String>) -> bool {
-        let states = self.analyze(words);
-        for (i, set) in states.iter().enumerate() {
-            println!("Set({}): {:?}", i, set);
-        }
-
+    pub fn accepts(states: &StateSetList, words: &Vec<&str>) -> bool {
         let expected = State::new(0, 1, 0);
         states[words.len()].contains(&expected)
     }
 }
+
+fn fmt_state_set(grammar: &Grammar, states: &HashSet<State>) -> String {
+    format!("{{ {} }}", states.iter()
+        .map(|x| grammar[x.rule_index].fmt_dot(x.dot))
+        .collect::<Vec<String>>()
+        .join(", "))
+}
+
+fn fmt_state_set_list(grammar: &Grammar, states: &StateSetList) -> String {
+    states.iter()
+        .enumerate()
+        .map(|(i, set)| format!("Set({}): {}", i, fmt_state_set(grammar, set)))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SPPFNode {
+    pub rule_index: usize,
+    pub start: usize,
+    pub end: usize
+}
+
+#[derive(Debug, Clone)]
+pub struct ForestBuilder {
+    visited: HashSet<SPPFNode>,
+    grammar: Grammar,
+}
+
+/*
+impl ForestBuilder {
+
+    fn build_tree(&mut self, node: &SPPFNode, state: &State) {
+        debug!("State: {}", self.grammar[state.rule_index].fmt_dot(state.dot));
+
+        let rule = &self.grammar[state.rule_index];
+
+        if state.dot > 0 {
+            // Index for the previous symbol
+            let index = state.dot - 1;
+            if rule.body[index].1 {
+                // Terminal symbol
+                if index == 0 {
+                    // Last symbol
+
+                } else {
+
+                }
+            } else {
+                // Non-terminal symbol
+                if index == 0 {
+                    // Last symbol
+
+                } else {
+
+                }
+            }        
+        }
+    }
+
+    pub fn build_forest(&mut self, states: &StateSetList) {
+        let n = states.len()-1;
+        let start_node = SPPFNode { 
+            rule_index: 0, 
+            start: 0, 
+            end: n 
+        };
+
+        let start_rule = &self.grammar[0];
+        for state in states[n].iter()
+            .filter(|x| is_final_state(&self.grammar, x) && self.grammar[x.rule_index].head == start_rule.head) {
+            self.build_tree(&start_node, state);
+        }
+    }
+}*/
 
 fn main() {
     env_logger::init();
@@ -227,14 +299,29 @@ fn main() {
     let grammar = parse_grammar("examples/grammar5.txt").ok().unwrap();
     let mut parser = EarleyParser::new(&grammar);
 
-    let stdin = io::stdin();
-    for line in stdin.lock().lines() {
-        let words: Vec<String> = line
-            .map(|x| x.split_whitespace().map(String::from).collect())
-            .unwrap();
-        println!("{:?}", words);
+    let mut rl = Editor::<()>::new();
+    loop {
+        let readline = rl.readline(">> ");
+        match readline {
+            Ok(line) => {
+                let words: Vec<&str> = line
+                    .split_whitespace()
+                    .collect();
+                
+                let states = parser.analyze(&words);
+                //build_forest(&grammar, &states);
 
-        let result = parser.accepts(&words);
-        println!("w in L(G): {}", result);
+                println!("{}", fmt_state_set_list(&grammar, &states));
+
+                let result = EarleyParser::accepts(&states, &words);
+                println!("w in L(G): {}", result);
+            },
+            Err(ReadlineError::Interrupted) => break,
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break
+            }
+        }
     }
 }

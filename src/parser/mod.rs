@@ -17,6 +17,33 @@ fn terminalize(s: &str, t: bool) -> String {
     }
 }
 
+impl Rule {
+    pub fn fmt_dot(&self, dot: usize) -> String {
+        let rhs = self.body
+                .iter()
+                .map(|(s, t)| terminalize(s, *t))
+                .enumerate()
+                .map(|(i, x)| if i == dot {
+                    format!("•{}", x)
+                } else { x })
+                .collect::<Vec<String>>()
+                .join(" ");
+
+        let last = if dot >= self.body.len() {
+            "•"
+        } else {
+            ""
+        };
+
+        format!(
+            "{} -> {}{}",
+            self.head,
+            rhs,
+            last
+        )
+    }
+}
+
 impl fmt::Display for Rule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
