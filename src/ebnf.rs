@@ -1,7 +1,10 @@
-//! Syntax analysis.
-use crate::lexer::{Error, Position, Token, TokenType};
+//! Parser for Extended Backus-Naur Form
+use crate::lexer::{Error, Position, Token, TokenType, Lexer};
 use std::fmt;
 use std::iter::Peekable;
+use std::fs;
+use std::io;
+use log::debug;
 
 #[derive(Debug, Clone)]
 pub struct Rule {
@@ -176,4 +179,40 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
         self.expect_type(TokenType::Eof)?;
         Ok(rules)
     }
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    IOError(io::Error),
+    LexisError(Error),
+}
+
+impl From<io::Error> for ParseError {
+    fn from(err: io::Error) -> ParseError {
+        ParseError::IOError(err)
+    }
+}
+
+impl From<Error> for ParseError {
+    fn from(err: Error) -> ParseError {
+        ParseError::LexisError(err)
+    }
+}
+
+pub fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
+    let content = fs::read_to_string(path)?;
+    let mut lexer = Lexer::new(&content);
+    let tokens = lexer.run()?;
+
+    for token in tokens.clone() {
+        debug!("{}", token);
+    }
+
+    let mut parser = EBNFParser::new(tokens.into_iter());
+    let grammar = parser.parse()?;
+    for (i, rule) in grammar.clone().iter().enumerate() {
+        debug!("{}. {}", i, rule);
+    }
+
+    Ok(grammar)
 }

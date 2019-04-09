@@ -1,0 +1,6 @@
+ROOT = S .
+S = A B .
+A = .
+B = C D C .
+C = .
+D = "a" .
