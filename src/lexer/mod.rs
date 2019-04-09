@@ -29,7 +29,7 @@ impl Position {
 }
 
 impl fmt::Display for Position {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.line, self.column)
     }
 }
@@ -41,7 +41,7 @@ pub struct Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.position, self.message)
     }
 }
@@ -54,7 +54,7 @@ pub struct Token {
 }
 
 impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Token ({:?}, {:?})", self.typ, self.value)
     }
 }
@@ -75,7 +75,7 @@ impl<'a> Lexer<'a> {
     ///
     /// * `src` - The source code string.
     ///
-    pub fn new(src: &str) -> Lexer {
+    pub fn new(src: &str) -> Lexer<'_> {
         let first = src.chars().next();
         Lexer {
             data: src,

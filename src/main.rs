@@ -297,6 +297,10 @@ fn main() {
     env_logger::init();
 
     let grammar = parse_grammar("examples/grammar5.txt").ok().unwrap();
+    for (i, rule) in grammar.iter().enumerate() {
+        println!("{}. {}", i+1, rule);
+    }
+
     let mut parser = EarleyParser::new(&grammar);
 
     let mut rl = Editor::<()>::new();
