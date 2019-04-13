@@ -16,7 +16,7 @@ use std::collections::HashSet;
 fn main() {
     env_logger::init();
 
-    let grammar = match ebnf::parse_grammar("simpleton.txt") {
+    let grammar = match ebnf::parse_grammar("examples/simpleton.txt") {
         Ok(x) => Rc::new(x),
         Err(x) => { panic!("{:?}", x) }
     };
