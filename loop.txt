@@ -1,0 +1,6 @@
+ROOT = S .
+S = ident ":=" ident "+" ident
+  | ident ":=" ident "-" ident
+  | S ";" S
+  | "loop" ident "do" S "end" .
+ident = "x" | "y" | "z" .

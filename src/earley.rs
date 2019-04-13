@@ -188,16 +188,31 @@ pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> Strin
         .join("\n")
 }
 
+/*
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SPPFNode {
     pub rule_index: usize,
     pub start: usize,
     pub end: usize
+}*/
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SPPFKind {
+    /// (x, j, i) - x symbol, j left extent, i right extent
+    Symbol(String, usize, usize),
+
+    //Intermediate(Rule, j, i)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SPPFNode {
+    pub kind: SPPFKind,
+    pub family: Vec<SPPFNode>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ForestBuilder {
-    visited: HashSet<SPPFNode>,
+    visited: HashSet<State>,
 }
 
 
@@ -211,6 +226,7 @@ impl ForestBuilder {
     fn build_tree(&mut self, grammar: &Rc<Grammar>, node: &SPPFNode, state: &State) {
         debug!("State: {}", grammar[state.rule_index].fmt_dot(state.dot));
 
+        self.visited.insert(state.clone());
         let rule = &grammar[state.rule_index];
 
         if state.dot > 0 {
@@ -239,9 +255,8 @@ impl ForestBuilder {
     pub fn build_forest(&mut self, grammar: &Rc<Grammar>, states: &StateSetList) {
         let n = states.len()-1;
         let start_node = SPPFNode { 
-            rule_index: 0, 
-            start: 0, 
-            end: n 
+            kind: SPPFKind::Symbol(grammar[0].head.clone(), 0, n),
+            family: vec![]
         };
 
         let start_rule: &Rule = &grammar[0];
