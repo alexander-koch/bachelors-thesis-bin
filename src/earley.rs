@@ -175,7 +175,7 @@ impl EarleyParser {
 
 pub fn fmt_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
     format!("{{ {} }}", states.iter()
-        .map(|x| grammar[x.rule_index].fmt_dot(x.dot))
+        .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
         .collect::<Vec<String>>()
         .join(", "))
 }
@@ -186,6 +186,21 @@ pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> Strin
         .map(|(i, set)| format!("Set({}): {}", i, fmt_state_set(grammar, set)))
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
+    format!("$ {} $", states.iter()
+        .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
+        .collect::<Vec<String>>()
+        .join(" $ \\\\ $ "))
+}
+
+pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
+    states.iter()
+        //.enumerate()
+        .map(|(set)| format!("\\makecell[l]{{ {} }}", fmt_tex_state_set(grammar, set)))
+        .collect::<Vec<String>>()
+        .join("\n&")
 }
 
 /*

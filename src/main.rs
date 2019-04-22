@@ -7,7 +7,10 @@ pub mod lexer;
 pub mod ebnf;
 
 pub mod ll;
+pub mod lr;
 pub mod harrison;
+
+use lr::LRParser;
 
 pub mod earley;
 use earley::EarleyParser;
@@ -74,7 +77,7 @@ fn main() {
 
     let mut table = if args.cmd_ll1 {
         let mut ff = ll::FFSets::new(&grammar);
-        let symbols = grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
+        let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
         for symbol in symbols.iter() {
             let first = ff.first(&symbol);
             println!("FIRST({}) = {:?}", symbol, first);
@@ -84,6 +87,17 @@ fn main() {
             let follow = ff.follow(&symbol);
             println!("FOLLOW({}) = {:?}", symbol, follow);
         }
+
+        // let mut set = HashSet::new();
+        // set.insert((lr::LR0Item::new(0, 0), "$".to_owned()));
+        // let closure = ff.closure(&set);
+        // println!("Closure: {:?}", closure);
+
+        // let goto1 = ff.goto_state(&closure, "a");
+        // println!("Goto: {:?}", goto1);
+
+        ff.compute_states();
+
         let table = ff.construct_ll_table();
         println!("Table: {:?}", table);
         Some(table)

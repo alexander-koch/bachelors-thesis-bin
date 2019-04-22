@@ -1,6 +1,7 @@
 ROOT = S .
-S = ident ":=" ident "+" ident
-  | ident ":=" ident "-" ident
+S = ident ":=" ident "+" const
+  | ident ":=" ident "-" const
   | S ";" S
   | "loop" ident "do" S "end" .
 ident = "x" | "y" | "z" .
+const = "0" | "1" .

@@ -6,6 +6,9 @@ use std::fs;
 use std::io;
 use log::debug;
 
+use std::collections::HashSet;
+use std::ops::Index;
+
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub head: String,
@@ -62,7 +65,54 @@ impl fmt::Display for Rule {
     }
 }
 
-pub type Grammar = Vec<Rule>;
+#[derive(Debug, Clone)]
+pub struct Grammar {
+    pub nonterminals: HashSet<String>,
+    pub terminals: HashSet<String>,
+    pub rules: Vec<Rule>,
+}
+
+impl Grammar {
+    pub fn new(rules: Vec<Rule>) -> Grammar {
+        Grammar {
+            nonterminals: rules.iter().map(|x| x.head.clone()).collect(),
+            terminals: rules.iter()
+                .flat_map(|x| 
+                    x.body.iter()
+                        .filter(|(_, t)| *t)
+                        .map(|(x, _)| x.clone())
+                ).collect(),
+            rules: rules
+        }
+    }
+
+    pub fn get_symbols(&self) -> HashSet<String> {
+        self.nonterminals.union(&self.terminals).cloned().collect()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Rule> {
+        self.rules.iter()
+    }
+}
+
+impl IntoIterator for Grammar {
+    type Item = Rule;
+    type IntoIter = std::vec::IntoIter<Rule>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.rules.into_iter()
+    } 
+}
+
+impl Index<usize> for Grammar {
+    type Output = Rule;
+
+    fn index(&self, index: usize) -> &Rule {
+        &self.rules[index]
+    }
+}
+
+// pub type Grammar = Vec<Rule>;
 pub type ParsingResult<T> = ::std::result::Result<T, Error>;
 
 /// Parser for the extended Backus-Naur form (EBNF)
@@ -177,7 +227,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
         //debug!("Parsing");
         let rules = self.parse_rules()?;
         self.expect_type(TokenType::Eof)?;
-        Ok(rules)
+        Ok(Grammar::new(rules))
     }
 }
 
@@ -210,7 +260,7 @@ pub fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
 
     let mut parser = EBNFParser::new(tokens.into_iter());
     let grammar = parser.parse()?;
-    for (i, rule) in grammar.clone().iter().enumerate() {
+    for (i, rule) in grammar.clone().into_iter().enumerate() {
         debug!("{}. {}", i, rule);
     }
 

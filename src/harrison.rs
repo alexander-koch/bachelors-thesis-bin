@@ -1,25 +1,7 @@
 use std::collections::HashSet;
 use crate::ebnf::Grammar;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct LR0Item {
-    rule_index: usize,
-    dot: usize
-}
-
-impl LR0Item {
-    pub fn new(rule_index: usize, dot: usize) -> LR0Item {
-        LR0Item {
-            rule_index: rule_index,
-            dot: dot
-        }
-    }
-}
-
-fn is_final(grammar: &Grammar, item: &LR0Item) -> bool {
-    let len = grammar[item.rule_index].body.len();
-    item.dot >= len || len == 0
-}
+use crate::lr::{LR0Item, is_final};
 
 fn complete(grammar: &Grammar, q: &HashSet<LR0Item>, r: &HashSet<LR0Item>, single: bool) -> HashSet<LR0Item> {
     let mut result = HashSet::new();
@@ -72,13 +54,13 @@ fn complete(grammar: &Grammar, q: &HashSet<LR0Item>, r: &HashSet<LR0Item>, singl
 
 // Update needs to contain finished rules in order to complete rule
 fn predict_items(grammar: &Grammar, rules: &HashSet<LR0Item>) -> HashSet<LR0Item> {
-    let mut result = rules.clone();
+    let mut result = HashSet::new();//rules.clone();
     let mut current_set = rules.clone();
 
     loop {
         // Stores all updates for this round
         //let mut update_set = HashSet::new();
-        let mut eps_set = HashSet::new();
+        //let mut eps_set = HashSet::new();
         let mut update_set = HashSet::new();
 
         // Check for epsilon rules
@@ -88,20 +70,20 @@ fn predict_items(grammar: &Grammar, rules: &HashSet<LR0Item>) -> HashSet<LR0Item
                 for (i, rule) in grammar.iter().enumerate() {
                     if &rule.head == token {
                         let item = LR0Item::new(i, 0);
-                        if !result.contains(&item) {
-                            eps_set.insert(item.clone());
+                        //if !result.contains(&item) {
+                           // eps_set.insert(item.clone());
                             update_set.insert(item);
-                        }
+                        //}
                     }
                 }
             }     
         }
 
-        for item in eps_set.iter() {
+        for item in update_set.clone().iter() {
             // Is one of the rules eps and therefore final?
             if is_final(grammar, item) {
                 let symbol = &grammar[item.rule_index].head;
-                for i in result.iter() {
+                for i in rules.union(&result).cloned().collect::<HashSet<LR0Item>>().iter() {
                     if !is_final(&grammar, &i) && grammar[i.rule_index].body[i.dot].0 == *symbol {
                         update_set.insert(LR0Item::new(i.rule_index, i.dot+1));
                     }
@@ -116,7 +98,8 @@ fn predict_items(grammar: &Grammar, rules: &HashSet<LR0Item>) -> HashSet<LR0Item
         result = result.union(&update_set).cloned().collect();
         current_set = update_set;
     }
-    result.difference(&rules).cloned().collect()
+   //result.difference(&rules).cloned().collect()
+   result
 }
 
 pub fn predict(grammar: &Grammar, input: &HashSet<String>) -> HashSet<LR0Item> {    
@@ -182,6 +165,7 @@ pub fn parse(grammar: &Grammar, words: &Vec<&str>) -> bool {
         for i in 0..j {
             ts = ts.union(&t[i][j]).cloned().collect();
         }
+        println!("Ts: {:?}", ts);
         t[j][j] = predict_items(grammar, &ts);
         println!("t[{}, {}] = {:?}", j, j, t[j][j]);
     }
