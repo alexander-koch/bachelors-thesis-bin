@@ -31,6 +31,7 @@ Usage:
   thesis_bin ll1 <grammar>
   thesis_bin lr1 <grammar>
   thesis_bin harrison <grammar>
+  thesis_bin firstfollow <grammar>
   thesis_bin (-h | --help)
   thesis_bin --version
 
@@ -46,6 +47,7 @@ struct Args {
     cmd_ll1: bool,
     cmd_lr1: bool,
     cmd_harrison: bool,
+    cmd_firstfollow: bool,
     flag_version: bool,
 }
 
@@ -71,15 +73,9 @@ fn main() {
         println!("{}. {}", i, rule);
     }
 
-    let mut earley_parser = if args.cmd_earley {
-        Some(EarleyParser::new(&grammar))
-    } else {
-        None
-    };
-
-    let mut ll_table = if args.cmd_ll1 {
+    if args.cmd_firstfollow {
         let mut ff = ll::FFSets::new(&grammar);
-        /*let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
+        let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
         for symbol in symbols.iter() {
             let first = ff.first(&symbol);
             println!("FIRST({}) = {:?}", symbol, first);
@@ -88,16 +84,18 @@ fn main() {
         for symbol in symbols.iter() {
             let follow = ff.follow(&symbol);
             println!("FOLLOW({}) = {:?}", symbol, follow);
-        }*/
+        }
+        std::process::exit(0);
+    }
 
-        // let mut set = HashSet::new();
-        // set.insert((lr::LR0Item::new(0, 0), "$".to_owned()));
-        // let closure = ff.closure(&set);
-        // println!("Closure: {:?}", closure);
+    let mut earley_parser = if args.cmd_earley {
+        Some(EarleyParser::new(&grammar))
+    } else {
+        None
+    };
 
-        // let goto1 = ff.goto_state(&closure, "a");
-        // println!("Goto: {:?}", goto1);
-
+    let mut ll_table = if args.cmd_ll1 {
+        let mut ff = ll::FFSets::new(&grammar);
         let table = ff.construct_ll_table();
         println!("Table: {:?}", table);
         Some(table)
