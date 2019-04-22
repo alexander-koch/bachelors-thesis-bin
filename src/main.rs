@@ -29,6 +29,7 @@ Copyright (c) Alexander Koch 2019
 Usage:
   thesis_bin earley <grammar>
   thesis_bin ll1 <grammar>
+  thesis_bin lr1 <grammar>
   thesis_bin harrison <grammar>
   thesis_bin (-h | --help)
   thesis_bin --version
@@ -43,6 +44,7 @@ struct Args {
     arg_grammar: Option<String>,
     cmd_earley: bool,
     cmd_ll1: bool,
+    cmd_lr1: bool,
     cmd_harrison: bool,
     flag_version: bool,
 }
@@ -75,9 +77,9 @@ fn main() {
         None
     };
 
-    let mut table = if args.cmd_ll1 {
+    let mut ll_table = if args.cmd_ll1 {
         let mut ff = ll::FFSets::new(&grammar);
-        let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
+        /*let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
         for symbol in symbols.iter() {
             let first = ff.first(&symbol);
             println!("FIRST({}) = {:?}", symbol, first);
@@ -86,7 +88,7 @@ fn main() {
         for symbol in symbols.iter() {
             let follow = ff.follow(&symbol);
             println!("FOLLOW({}) = {:?}", symbol, follow);
-        }
+        }*/
 
         // let mut set = HashSet::new();
         // set.insert((lr::LR0Item::new(0, 0), "$".to_owned()));
@@ -96,9 +98,16 @@ fn main() {
         // let goto1 = ff.goto_state(&closure, "a");
         // println!("Goto: {:?}", goto1);
 
-        ff.compute_states();
-
         let table = ff.construct_ll_table();
+        println!("Table: {:?}", table);
+        Some(table)
+    } else {
+        None
+    };
+
+    let mut lr_table = if args.cmd_lr1 {
+        let mut ff = ll::FFSets::new(&grammar);
+        let table = ff.compute_states();
         println!("Table: {:?}", table);
         Some(table)
     } else {
@@ -122,7 +131,9 @@ fn main() {
 
                     EarleyParser::accepts(&states, &words)
                 } else if args.cmd_ll1 {
-                    ll::parse_ll(&grammar, table.as_mut().unwrap(), &words)
+                    ll::parse_ll(&grammar, ll_table.as_mut().unwrap(), &words)
+                } else if args.cmd_lr1 {
+                    lr::parse_lr(&grammar, lr_table.as_mut().unwrap(), &words)
                 } else {
                     harrison::parse(&grammar, &words)
                 };

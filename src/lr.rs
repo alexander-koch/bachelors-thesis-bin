@@ -1,5 +1,5 @@
 use crate::ebnf::Grammar;
-use std::collections::{HashSet, BTreeSet};
+use std::collections::{HashSet, BTreeSet, HashMap};
 use crate::ll::FFSets;
 
 use log::debug;
@@ -25,22 +25,22 @@ pub fn is_final(grammar: &Grammar, item: &LR0Item) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum LRTableEntry {
-    Action(Action),
-    Goto(usize)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Action {
     Shift(usize),
     Reduce(usize),
     Acc
 }
 
+#[derive(Debug, Clone)]
+pub struct LRTable {
+    action_table: Vec<HashMap<String, Action>>,
+    goto_table: Vec<HashMap<String, usize>>
+}
+
 pub trait LRParser {
     fn closure(&mut self, set: &BTreeSet<(LR0Item, String)>) -> BTreeSet<(LR0Item, String)>;
     fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: &(String, bool)) -> BTreeSet<(LR0Item, String)>;
-    fn compute_states(&mut self);
+    fn compute_states(&mut self) -> LRTable;
 }
 
 impl LRParser for FFSets {
@@ -103,7 +103,7 @@ impl LRParser for FFSets {
         self.closure(&result)
     }
 
-    fn compute_states(&mut self) {
+    fn compute_states(&mut self) -> LRTable {
         // Compute initial state set Q
         let mut set = BTreeSet::new();
         set.insert((LR0Item::new(0, 0), "$".to_owned()));
@@ -145,9 +145,9 @@ impl LRParser for FFSets {
 
                     // Add shift or goto based on symbol type
                     if symbol.1 {
-                        actions.insert((i, LRTableEntry::Action(Action::Shift(j)), symbol.0.clone()));
+                        actions.insert((i, Action::Shift(j), symbol.0.clone()));
                     } else {
-                        gotos.insert((i, LRTableEntry::Goto(j), symbol.0.clone()));
+                        gotos.insert((i, j, symbol.0.clone()));
                     }
                 }
 
@@ -155,17 +155,70 @@ impl LRParser for FFSets {
                 for (item, symbol) in q.into_iter() {
                     if is_final(&self.grammar, &item) {
                         if item.rule_index == 0 && symbol == "$" {
-                            actions.insert((i, LRTableEntry::Action(Action::Acc), symbol.clone()));
+                            actions.insert((i, Action::Acc, symbol.clone()));
                         } else {
-                            let len = self.grammar[item.rule_index].body.len();
-                            actions.insert((i, LRTableEntry::Action(Action::Reduce(len)), symbol.clone()));
+                            // let len = self.grammar[item.rule_index].body.len();
+                            actions.insert((i, Action::Reduce(item.rule_index), symbol.clone()));
                         }
                     }
                 }
             }
         }
 
-        debug!("states: {:?}", qs);
-        debug!("actions: {:?}", actions);
+        let mut action_table = vec![HashMap::new(); qs.len()];
+        let mut goto_table = vec![HashMap::new(); qs.len()];
+
+        for (i, action, sym) in actions {
+            action_table[i].insert(sym, action);
+        }
+
+        for (i, action, sym) in gotos {
+            goto_table[i].insert(sym, action);
+        }
+
+        // debug!("states: {:?}", qs);
+        // debug!("actions: {:?}", actions);
+
+        println!("action_table: {:?}", action_table);
+        println!("goto_table: {:?}", goto_table);
+
+        LRTable {
+            action_table: action_table,
+            goto_table: goto_table
+        }
+    }
+}
+
+pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
+    let mut stack = vec![0];
+    let mut i = 0;
+    let mut words = input.clone();
+    words.push("$");
+
+    loop {
+        let word = words[i];
+        let state = *stack.last().unwrap();
+
+        println!("State: {}, Word: {}", state, word);
+
+        match table.action_table[state].get(word) {
+            Some(Action::Shift(s)) => {
+                debug!("Shift");
+                stack.push(*s);
+                i += 1;
+            },
+            Some(Action::Reduce(i)) => {
+                debug!("Reduce");
+                let k = grammar[*i].body.len();
+                stack.truncate(stack.len()-k);
+
+                let rule = &grammar[*i];
+                println!("Apply: {}", rule);
+
+                stack.push(table.goto_table[*stack.last().unwrap()][&rule.head]);
+            },
+            Some(Action::Acc) => return true,
+            _ => return false
+        }
     }
 }
