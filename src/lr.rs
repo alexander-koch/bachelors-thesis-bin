@@ -2,6 +2,8 @@ use crate::ebnf::Grammar;
 use std::collections::{HashSet, BTreeSet};
 use crate::ll::FFSets;
 
+use log::debug;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LR0Item {
     pub rule_index: usize,
@@ -22,9 +24,22 @@ pub fn is_final(grammar: &Grammar, item: &LR0Item) -> bool {
     item.dot >= len || len == 0
 }
 
+#[derive(Debug, Clone)]
+pub enum LRTableEntry {
+    Action(Action),
+    Goto(usize)
+}
+
+#[derive(Debug, Clone)]
+pub enum Action {
+    Shift(usize),
+    Reduce(usize),
+    Acc
+}
+
 pub trait LRParser {
     fn closure(&mut self, set: &BTreeSet<(LR0Item, String)>) -> BTreeSet<(LR0Item, String)>;
-    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: &str) -> BTreeSet<(LR0Item, String)>;
+    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: (String, bool)) -> BTreeSet<(LR0Item, String)>;
     fn compute_states(&mut self);
 }
 
@@ -74,13 +89,13 @@ impl LRParser for FFSets {
     }
 
     // Basically a completer
-    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: &str) -> BTreeSet<(LR0Item, String)> {
+    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: (String, bool)) -> BTreeSet<(LR0Item, String)> {
         let mut result = BTreeSet::new();
         for (item, a) in set.iter() {
 
             let rule = &self.grammar[item.rule_index];
-            if let Some((token, _)) = rule.body.get(item.dot) {
-                if token == x {
+            if let Some(y) = rule.body.get(item.dot) {
+                if *y == x {
                     result.insert((LR0Item::new(item.rule_index, item.dot + 1), a.clone()));
                 }
             }
@@ -93,34 +108,82 @@ impl LRParser for FFSets {
         set.insert((LR0Item::new(0, 0), "$".to_owned()));
         let q0 = self.closure(&set);
 
-        let mut qs = BTreeSet::new();
-        qs.insert(q0);
+        debug!("q0: {:?}", q0);
 
-        let symbols = self.grammar.get_symbols();
+        // Global state set Q
+        let mut qs = Vec::new();
+        qs.push(q0);
 
+        let terminals = self.grammar.terminals.clone();
+        let nonterminals = self.grammar.nonterminals.clone();
+
+        // The table transitions
+        let mut final_transitions = Vec::new();
+
+        // Current working set
+        let mut current = qs.clone();
         loop {
-            let mut updates = BTreeSet::new();
-            for q in qs.iter() {
-                println!("Q: {:?}", q);
+            let mut updates = Vec::new();
+            let mut transitions: Vec<(usize, LRTableEntry, String)> = Vec::new();
+            let top = qs.len();
+            let mut idx = top;
 
-                for item in symbols.iter() {
-                    let cls = self.goto_state(q, item);
-                    println!("Updates: {} -> {:?}", item, cls);
-                    if !qs.contains(&cls) && !cls.is_empty() {
-                        updates.insert(cls);
+            // Only iterate the current set instead of the whole set Q
+            for (k, q) in current.iter().enumerate() {
+                let i = top-current.len()+k;
+
+                // Add terminal shift transitions
+                for symbol in terminals.iter() {
+                    let cls = self.goto_state(&q, (symbol.clone(), true));
+                    if !cls.is_empty() {
+                        debug!("q{}: {:?}", idx, cls);
+                        debug!("q{} -> q{} via {}", i, idx, symbol);
+
+                        // Add the new state
+                        updates.push(cls);
+
+                        // Add a shift transition
+                        transitions.push((i, LRTableEntry::Action(Action::Shift(idx)), symbol.clone()));
+                        idx += 1;
                     }
                 }
 
-                // println!("Changes: {:?}", updates);
+                // Add non-terminal goto transitions
+                for symbol in nonterminals.iter() {
+                    let cls = self.goto_state(&q, (symbol.clone(), false));
+                    if !cls.is_empty() {
+                        debug!("q{}: {:?}", idx, cls);
+                        updates.push(cls);
+                        transitions.push((i, LRTableEntry::Goto(idx), symbol.clone()));
+                        idx += 1;
+                    }
+                }
+
+                // Reduce transitions
+                for (item, symbol) in q.into_iter() {
+                    if is_final(&self.grammar, &item) {
+                        if item.rule_index == 0 && symbol == "$" {
+                            transitions.push((i, LRTableEntry::Action(Action::Acc), symbol.clone()));
+                        } else {
+                            let len = self.grammar[item.rule_index].body.len();
+                            transitions.push((i, LRTableEntry::Action(Action::Reduce(len)), symbol.clone()));
+                        }
+                    }
+                }
             }
 
-            if updates.is_empty() {
+            // Finish loop or update and repeat
+            if updates.is_empty() && transitions.is_empty() {
                 break
             } else {
-                qs = qs.union(&updates).cloned().collect();
+                qs.extend(updates.iter().cloned());
+                final_transitions.extend(transitions.iter().cloned());
+                current = updates;
             }
         }
 
-        println!("QS: {:?}", qs);
+        // for (i, e, s) in final_transitions.iter()
+
+        // debug!("Transitions: {:?}", final_transitions);
     }
 }
