@@ -1,20 +1,20 @@
 use crate::ebnf::Grammar;
-use std::collections::{HashSet, BTreeSet, HashMap};
 use crate::ll::FFSets;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use log::debug;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LR0Item {
     pub rule_index: usize,
-    pub dot: usize
+    pub dot: usize,
 }
 
 impl LR0Item {
     pub fn new(rule_index: usize, dot: usize) -> LR0Item {
         LR0Item {
             rule_index: rule_index,
-            dot: dot
+            dot: dot,
         }
     }
 }
@@ -28,26 +28,29 @@ pub fn is_final(grammar: &Grammar, item: &LR0Item) -> bool {
 pub enum Action {
     Shift(usize),
     Reduce(usize),
-    Acc
+    Acc,
 }
 
 #[derive(Debug, Clone)]
 pub struct LRTable {
     action_table: Vec<HashMap<String, Action>>,
-    goto_table: Vec<HashMap<String, usize>>
+    goto_table: Vec<HashMap<String, usize>>,
 }
 
 pub trait LRParser {
     fn closure(&mut self, set: &BTreeSet<(LR0Item, String)>) -> BTreeSet<(LR0Item, String)>;
-    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: &(String, bool)) -> BTreeSet<(LR0Item, String)>;
+    fn goto_state(
+        &mut self,
+        set: &BTreeSet<(LR0Item, String)>,
+        x: &(String, bool),
+    ) -> BTreeSet<(LR0Item, String)>;
     fn compute_states(&mut self) -> LRTable;
 }
 
 impl LRParser for FFSets {
-
     fn closure(&mut self, set: &BTreeSet<(LR0Item, String)>) -> BTreeSet<(LR0Item, String)> {
         let mut q = set.clone();
-        
+
         loop {
             let mut updates = BTreeSet::new();
 
@@ -60,14 +63,19 @@ impl LRParser for FFSets {
                 if let Some((current, term)) = rule.body.get(item.dot) {
                     // Assure that it is a non-terminal
                     if *term {
-                        continue
+                        continue;
                     }
                     // Get all follow-up tokens
-                    let mut tokens = rule.body[item.dot+1..].to_vec();
+                    let mut tokens = rule.body[item.dot + 1..].to_vec();
                     tokens.push((a.clone(), true));
 
                     // Find all rules that begin with said symbol
-                    for i in gr.iter().enumerate().filter(|(_, x)| x.head == *current).map(|(i, _)| i) {
+                    for i in gr
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, x)| x.head == *current)
+                        .map(|(i, _)| i)
+                    {
                         // Calculate first set
                         for token in self.scan_over(&tokens) {
                             let new_item = (LR0Item::new(i, 0), token);
@@ -76,11 +84,11 @@ impl LRParser for FFSets {
                             }
                         }
                     }
-                }                
+                }
             }
 
             if updates.is_empty() {
-                break
+                break;
             } else {
                 q = q.union(&updates).cloned().collect();
             }
@@ -89,10 +97,13 @@ impl LRParser for FFSets {
     }
 
     // Basically a completer
-    fn goto_state(&mut self, set: &BTreeSet<(LR0Item, String)>, x: &(String, bool)) -> BTreeSet<(LR0Item, String)> {
+    fn goto_state(
+        &mut self,
+        set: &BTreeSet<(LR0Item, String)>,
+        x: &(String, bool),
+    ) -> BTreeSet<(LR0Item, String)> {
         let mut result = BTreeSet::new();
         for (item, a) in set.iter() {
-
             let rule = &self.grammar[item.rule_index];
             if let Some(y) = rule.body.get(item.dot) {
                 if y == x {
@@ -110,10 +121,16 @@ impl LRParser for FFSets {
         let q0 = self.closure(&set);
         let mut qs = vec![q0];
 
-        let terminals = self.grammar.terminals.iter()
+        let terminals = self
+            .grammar
+            .terminals
+            .iter()
             .map(|x| (x.clone(), true))
             .collect::<HashSet<(String, bool)>>();
-        let nonterminals = self.grammar.nonterminals.iter()
+        let nonterminals = self
+            .grammar
+            .nonterminals
+            .iter()
             .map(|x| (x.clone(), false))
             .collect::<HashSet<(String, bool)>>();
         let symbols: HashSet<(String, bool)> = terminals.union(&nonterminals).cloned().collect();
@@ -128,19 +145,18 @@ impl LRParser for FFSets {
 
             // Only iterate the current set instead of the whole set Q
             for (i, q) in qs.clone().iter().enumerate() {
-
                 // Add terminal shift transitions
                 for symbol in symbols.iter() {
                     let cls = self.goto_state(&q, symbol);
                     if cls.is_empty() {
-                        continue
+                        continue;
                     }
 
                     // Find index or append
                     let j = qs.iter().position(|x| x == &cls).unwrap_or_else(|| {
                         qs.push(cls.clone());
                         changes = true;
-                        qs.len()-1
+                        qs.len() - 1
                     });
 
                     // Add shift or goto based on symbol type
@@ -184,7 +200,7 @@ impl LRParser for FFSets {
 
         LRTable {
             action_table: action_table,
-            goto_table: goto_table
+            goto_table: goto_table,
         }
     }
 }
@@ -206,19 +222,19 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
                 debug!("Shift");
                 stack.push(*s);
                 i += 1;
-            },
+            }
             Some(Action::Reduce(i)) => {
                 debug!("Reduce");
                 let k = grammar[*i].body.len();
-                stack.truncate(stack.len()-k);
+                stack.truncate(stack.len() - k);
 
                 let rule = &grammar[*i];
                 println!("Apply: {}", rule);
 
                 stack.push(table.goto_table[*stack.last().unwrap()][&rule.head]);
-            },
+            }
             Some(Action::Acc) => return true,
-            _ => return false
+            _ => return false,
         }
     }
 }

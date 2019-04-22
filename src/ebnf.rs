@@ -1,10 +1,10 @@
 //! Parser for Extended Backus-Naur Form
-use crate::lexer::{Error, Position, Token, TokenType, Lexer};
+use crate::lexer::{Error, Lexer, Position, Token, TokenType};
+use log::debug;
 use std::fmt;
-use std::iter::Peekable;
 use std::fs;
 use std::io;
-use log::debug;
+use std::iter::Peekable;
 
 use std::collections::HashSet;
 use std::ops::Index;
@@ -25,28 +25,18 @@ fn terminalize(s: &str, t: bool) -> String {
 
 impl Rule {
     pub fn fmt_dot(&self, dot: usize) -> String {
-        let rhs = self.body
-                .iter()
-                .map(|(s, t)| terminalize(s, *t))
-                .enumerate()
-                .map(|(i, x)| if i == dot {
-                    format!("•{}", x)
-                } else { x })
-                .collect::<Vec<String>>()
-                .join(" ");
+        let rhs = self
+            .body
+            .iter()
+            .map(|(s, t)| terminalize(s, *t))
+            .enumerate()
+            .map(|(i, x)| if i == dot { format!("•{}", x) } else { x })
+            .collect::<Vec<String>>()
+            .join(" ");
 
-        let last = if dot >= self.body.len() {
-            "•"
-        } else {
-            ""
-        };
+        let last = if dot >= self.body.len() { "•" } else { "" };
 
-        format!(
-            "{} -> {}{}",
-            self.head,
-            rhs,
-            last
-        )
+        format!("{} -> {}{}", self.head, rhs, last)
     }
 }
 
@@ -76,13 +66,11 @@ impl Grammar {
     pub fn new(rules: Vec<Rule>) -> Grammar {
         Grammar {
             nonterminals: rules.iter().map(|x| x.head.clone()).collect(),
-            terminals: rules.iter()
-                .flat_map(|x| 
-                    x.body.iter()
-                        .filter(|(_, t)| *t)
-                        .map(|(x, _)| x.clone())
-                ).collect(),
-            rules: rules
+            terminals: rules
+                .iter()
+                .flat_map(|x| x.body.iter().filter(|(_, t)| *t).map(|(x, _)| x.clone()))
+                .collect(),
+            rules: rules,
         }
     }
 
@@ -101,7 +89,7 @@ impl IntoIterator for Grammar {
 
     fn into_iter(self) -> Self::IntoIter {
         self.rules.into_iter()
-    } 
+    }
 }
 
 impl Index<usize> for Grammar {

@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use crate::ebnf::{Grammar, Rule};
 use log::{debug, trace};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -174,14 +174,19 @@ impl EarleyParser {
 }
 
 pub fn fmt_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
-    format!("{{ {} }}", states.iter()
-        .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
-        .collect::<Vec<String>>()
-        .join(", "))
+    format!(
+        "{{ {} }}",
+        states
+            .iter()
+            .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
+            .collect::<Vec<String>>()
+            .join(", ")
+    )
 }
 
 pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
-    states.iter()
+    states
+        .iter()
         .enumerate()
         .map(|(i, set)| format!("Set({}): {}", i, fmt_state_set(grammar, set)))
         .collect::<Vec<String>>()
@@ -189,16 +194,21 @@ pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> Strin
 }
 
 pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
-    format!("$ {} $", states.iter()
-        .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
-        .collect::<Vec<String>>()
-        .join(" $ \\\\ $ "))
+    format!(
+        "$ {} $",
+        states
+            .iter()
+            .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
+            .collect::<Vec<String>>()
+            .join(" $ \\\\ $ ")
+    )
 }
 
 pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
-    states.iter()
+    states
+        .iter()
         //.enumerate()
-        .map(|(set)| format!("\\makecell[l]{{ {} }}", fmt_tex_state_set(grammar, set)))
+        .map(|set| format!("\\makecell[l]{{ {} }}", fmt_tex_state_set(grammar, set)))
         .collect::<Vec<String>>()
         .join("\n&")
 }
@@ -215,7 +225,6 @@ pub struct SPPFNode {
 pub enum SPPFKind {
     /// (x, j, i) - x symbol, j left extent, i right extent
     Symbol(String, usize, usize),
-
     //Intermediate(Rule, j, i)
 }
 
@@ -230,11 +239,10 @@ pub struct ForestBuilder {
     visited: HashSet<State>,
 }
 
-
 impl ForestBuilder {
     pub fn new() -> ForestBuilder {
         ForestBuilder {
-            visited: HashSet::new()
+            visited: HashSet::new(),
         }
     }
 
@@ -263,20 +271,22 @@ impl ForestBuilder {
                 } else {
 
                 }
-            }        
+            }
         }
     }
 
     pub fn build_forest(&mut self, grammar: &Rc<Grammar>, states: &StateSetList) {
-        let n = states.len()-1;
-        let start_node = SPPFNode { 
+        let n = states.len() - 1;
+        let start_node = SPPFNode {
             kind: SPPFKind::Symbol(grammar[0].head.clone(), 0, n),
-            family: vec![]
+            family: vec![],
         };
 
         let start_rule: &Rule = &grammar[0];
-        for state in states[n].iter()
-            .filter(|x| is_final_state(grammar, x) && grammar[x.rule_index].head == start_rule.head) {
+        for state in states[n]
+            .iter()
+            .filter(|x| is_final_state(grammar, x) && grammar[x.rule_index].head == start_rule.head)
+        {
             self.build_tree(grammar, &start_node, state);
         }
     }

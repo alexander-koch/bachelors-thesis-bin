@@ -1,14 +1,13 @@
-
-use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::Editor;
 use std::rc::Rc;
 
-pub mod lexer;
 pub mod ebnf;
+pub mod lexer;
 
+pub mod harrison;
 pub mod ll;
 pub mod lr;
-pub mod harrison;
 
 use lr::LRParser;
 
@@ -66,7 +65,7 @@ fn main() {
     let grammar_path = args.arg_grammar.unwrap();
     let grammar = match ebnf::parse_grammar(&grammar_path) {
         Ok(x) => Rc::new(x),
-        Err(x) => { panic!("{:?}", x) }
+        Err(x) => panic!("{:?}", x),
     };
 
     for (i, rule) in grammar.iter().enumerate() {
@@ -75,7 +74,10 @@ fn main() {
 
     if args.cmd_firstfollow {
         let mut ff = ll::FFSets::new(&grammar);
-        let symbols = &grammar.iter().map(|x| x.head.clone()).collect::<HashSet<String>>();
+        let symbols = &grammar
+            .iter()
+            .map(|x| x.head.clone())
+            .collect::<HashSet<String>>();
         for symbol in symbols.iter() {
             let first = ff.first(&symbol);
             println!("FIRST({}) = {:?}", symbol, first);
@@ -117,9 +119,7 @@ fn main() {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
-                let words: Vec<&str> = line
-                    .split_whitespace()
-                    .collect();
+                let words: Vec<&str> = line.split_whitespace().collect();
 
                 println!("{:?}", words);
 
@@ -137,12 +137,12 @@ fn main() {
                 };
 
                 println!("w in L(G): {}", result);
-            },
+            }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
             Err(err) => {
                 println!("Error: {:?}", err);
-                break
+                break;
             }
         }
     }

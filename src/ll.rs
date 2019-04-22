@@ -1,4 +1,4 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ebnf::Grammar;
@@ -7,16 +7,15 @@ use crate::ebnf::Grammar;
 pub struct FFSets {
     pub grammar: Rc<Grammar>,
     pub known_firsts: HashMap<String, HashSet<String>>,
-    pub known_follows: HashMap<String, HashSet<String>>
+    pub known_follows: HashMap<String, HashSet<String>>,
 }
 
 impl FFSets {
-
     pub fn new(grammar: &Rc<Grammar>) -> FFSets {
         FFSets {
             grammar: grammar.clone(),
             known_firsts: HashMap::new(),
-            known_follows: HashMap::new()
+            known_follows: HashMap::new(),
         }
     }
 
@@ -28,7 +27,7 @@ impl FFSets {
             for (item, term) in tokens.iter() {
                 if *term {
                     first_set.insert(item.clone());
-                    break
+                    break;
                 } else {
                     let x = self.first(item);
                     // Found terminal symbol, stopping, remove epsilon
@@ -38,7 +37,7 @@ impl FFSets {
 
                     first_set = first_set.union(&x).cloned().collect();
                     if !first_set.contains("") {
-                        break
+                        break;
                     }
                 }
             }
@@ -51,13 +50,15 @@ impl FFSets {
             val.clone()
         } else {
             let gr = self.grammar.clone();
-            let first_set = gr.iter()
+            let first_set = gr
+                .iter()
                 .filter(|x| x.head == symbol)
                 .fold(HashSet::new(), |acc, x| {
                     acc.union(&self.scan_over(&x.body)).cloned().collect()
                 });
-            
-            self.known_firsts.insert(symbol.to_owned(), first_set.clone());
+
+            self.known_firsts
+                .insert(symbol.to_owned(), first_set.clone());
             first_set
         }
     }
@@ -76,38 +77,50 @@ impl FFSets {
 
             // Start with an empty set to avoid infinite recursion
             self.known_follows.insert(symbol.to_owned(), HashSet::new());
-            
+
             // 1. Rule: Add ending symbol to FOLLOW(S)
             if self.grammar[0].head == symbol {
                 follow_set.insert("$".to_owned());
             }
 
             for rule in gr.iter() {
-                let ix = rule.body.iter().enumerate().filter_map(|(i, x)| if x.0 == symbol && !x.1 { Some(i) } else { None });
-                for i in ix {                
+                let ix = rule.body.iter().enumerate().filter_map(|(i, x)| {
+                    if x.0 == symbol && !x.1 {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                });
+                for i in ix {
                     // 2. Rule: If beta exists, then add FIRST(beta) - eps to FOLLOW(B)
 
                     // Check if beta is not epsilon
-                    if let Some(_) = rule.body.get(i+1) {
-
+                    if let Some(_) = rule.body.get(i + 1) {
                         // Calculate FIRST(beta)
-                        let mut y = self.scan_over(&rule.body[i+1..].to_vec());
+                        let mut y = self.scan_over(&rule.body[i + 1..].to_vec());
 
                         // 3. a) Rule: If FIRST(beta) contained epsilon, add FOLLOW(A) to FOLLOW(B)
                         if y.contains("") {
                             y.remove("");
-                            follow_set = follow_set.union(&self.follow(&rule.head)).cloned().collect();
+                            follow_set = follow_set
+                                .union(&self.follow(&rule.head))
+                                .cloned()
+                                .collect();
                         }
-                            
+
                         follow_set = follow_set.union(&y).cloned().collect();
                     } else {
                         // 3. b) Rule: If beta does not exist, add FOLLOW(A) to FOLLOW(B)
-                        follow_set = follow_set.union(&self.follow(&rule.head)).cloned().collect();
+                        follow_set = follow_set
+                            .union(&self.follow(&rule.head))
+                            .cloned()
+                            .collect();
                     }
                 }
             }
 
-            self.known_follows.insert(symbol.to_owned(), follow_set.clone());
+            self.known_follows
+                .insert(symbol.to_owned(), follow_set.clone());
             follow_set
         }
     }
@@ -130,14 +143,21 @@ impl FFSets {
             }
 
             for symbol in set.iter() {
-                table.entry(rule.head.clone()).or_insert_with(HashMap::new).insert(symbol.clone(), i);
+                table
+                    .entry(rule.head.clone())
+                    .or_insert_with(HashMap::new)
+                    .insert(symbol.clone(), i);
             }
         }
         table
     }
 }
 
-pub fn parse_ll(grammar: &Grammar, table: &HashMap<String, HashMap<String, usize>>, input: &Vec<&str>) -> bool {
+pub fn parse_ll(
+    grammar: &Grammar,
+    table: &HashMap<String, HashMap<String, usize>>,
+    input: &Vec<&str>,
+) -> bool {
     let mut stack = vec![("$", true), (&grammar[0].head, false)];
 
     let mut words = input.clone();
@@ -150,9 +170,9 @@ pub fn parse_ll(grammar: &Grammar, table: &HashMap<String, HashMap<String, usize
         if let Some((symbol, term)) = stack.last() {
             if *term {
                 if &words[i] != symbol {
-                    return false
+                    return false;
                 } else if words[i] == "$" {
-                    return true
+                    return true;
                 } else {
                     stack.pop();
                     i += 1;
@@ -165,7 +185,7 @@ pub fn parse_ll(grammar: &Grammar, table: &HashMap<String, HashMap<String, usize
                         stack.push((&symbol, *term));
                     }
                 } else {
-                    return false
+                    return false;
                 }
             }
         }
