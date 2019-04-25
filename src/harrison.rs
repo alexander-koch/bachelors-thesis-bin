@@ -3,145 +3,127 @@ use std::collections::HashSet;
 
 use crate::lr::{is_final, LR0Item};
 
+pub fn fmt_tex_lr0_set(grammar: &Grammar, states: &HashSet<LR0Item>) -> String {
+    format!(
+        "$ {} $",
+        states
+            .iter()
+            .map(|x| grammar[x.rule_index].fmt_tex_dot(x.dot))
+            .collect::<Vec<String>>()
+            .join(" $ \\\\ $ ")
+    )
+}
+
+pub fn fmt_tex_lr0_matrix(grammar: &Grammar, t: Vec<Vec<HashSet<LR0Item>>>) -> String {
+    t
+        .iter()
+        //.enumerate()
+        .map(|column| column.iter()
+            .map(|x| format!("\\makecell[l]{{ {} }}", fmt_tex_lr0_set(grammar, x)))
+            .collect::<Vec<String>>()
+            .join("\n&")
+        )
+        .collect::<Vec<String>>()
+        .join("\\\\ \\hline \n")
+}
+
+fn skip_epsilon(grammar: &Grammar, item: LR0Item) -> LR0Item {
+
+    /*let mut input = HashSet::new();
+    if let Some((token, term)) = grammar[item.rule_index].body.get(item.dot)
+
+    input.insert()
+
+    predict(grammar, input: &HashSet<String>)*/
+
+    // TODO
+
+    /*let allowed_indices: HashSet<usize> = items.iter().map(|x| x.rule_index).collect();
+    predict_lr0_items(grammar, items)
+        .iter()
+        .filter(|x| allowed_indices.contains(&x.rule_index))
+        .cloned()
+        .collect()*/
+
+    item
+}
+
+// B =>* C strict
+// B =>* Cn not strict
+
+fn find_reductions(grammar: &Grammar, symbol: String) -> HashSet<String> {
+    let mut result = HashSet::new();
+
+    // TODO
+
+    result
+}
+
+fn find_derivations(grammar: &Grammar, symbol: String) -> HashSet<LR0Item> {
+    //let mut result: HashSet<LR0Item> = HashSet::new();
+
+    //grammar.iter().filter(|x| 
+    let start = grammar.iter()
+        .enumerate()
+        .filter(|(_, x)| x.head == symbol)
+        .map(|(i, _)| LR0Item::new(i, 0))
+        .collect::<HashSet<LR0Item>>();
+
+    let mut result = start;
+
+    loop {
+        let mut update = HashSet::new();
+        for (sym, term) in result.iter().flat_map(|x| grammar[x.rule_index].body.get(x.dot)) {
+            update = update.union(&grammar.iter().enumerate().filter(|(_, x)| x.head == *sym && !term)
+                .map(|(i, _)| LR0Item::new(i, 0)).collect()).cloned().collect();
+        }
+        update = update.union(&complete(grammar, &result, &result, false)).cloned().collect();
+        
+        if update.is_subset(&result) {
+            break
+        } else {
+            result = result.union(&update).cloned().collect();
+        }
+    }
+    result
+}
+
 fn complete(
     grammar: &Grammar,
     q: &HashSet<LR0Item>,
     r: &HashSet<LR0Item>,
-    single: bool,
+    chained: bool,
 ) -> HashSet<LR0Item> {
     let mut result = HashSet::new();
-    let mut unfinished: HashSet<LR0Item> = q.clone();
-    let mut terminating = r.clone();
 
-    loop {
-        let mut updates = HashSet::new();
+    let terminated_items = r.iter().filter(|x| is_final(grammar, x));
+    let terminated_symbols: HashSet<String> = if chained {
+        terminated_items.flat_map(|x| {
+            let mut set = find_reductions(grammar, grammar[x.rule_index].head.clone());
+            set.insert(grammar[x.rule_index].head.clone());
+            set
+        }).collect()
+    } else {
+        terminated_items.map(|x| grammar[x.rule_index].head.clone()).collect()
+    };
 
-        // Iterate every final rule in R
-        for symbol in terminating
-            .iter()
-            .filter(|x| is_final(grammar, &x))
-            .map(|x| &grammar[x.rule_index].head)
-        {
-            // Iterate every rule in Q that can possibly be completed by any given rule in R
-            for i in unfinished.iter() {
-                // Check that the rule in Q is not finished and currently looks at the symbol
-                // that is finished by the rule in R
-                if !is_final(&grammar, &i) && grammar[i.rule_index].body[i.dot].0 == *symbol {
-                    let item = LR0Item::new(i.rule_index, i.dot + 1);
-                    //result.insert(item.clone());
-                    if !result.contains(&item) {
-                        updates.insert(item);
-                    }
+    for terminated_item in terminated_symbols {   
+        for unfinished_item in q.iter().filter(|x| !is_final(grammar, x)) {
+            // Retrieve the token that is currently read
+            if let Some((token, term)) = &grammar[unfinished_item.rule_index].body.get(unfinished_item.dot) {
+                // If the tokens match
+                if !*term && *token == terminated_item {
+                    result.insert(skip_epsilon(grammar, LR0Item::new(unfinished_item.rule_index, unfinished_item.dot + 1)));
                 }
-            }
-        }
-
-        if updates.is_empty() {
-            break;
-        }
-
-        // Find possible epsilon completions
-        updates = predict_items(grammar, &updates)
-            .union(&updates)
-            .cloned()
-            .collect::<HashSet<LR0Item>>()
-            .difference(&q)
-            .cloned()
-            .collect();
-        result = result.union(&updates).cloned().collect();
-
-        if single {
-            break;
-        }
-
-        // Rip updates apart
-        for rule in updates.iter() {
-            if is_final(grammar, &rule) {
-                terminating.insert(rule.clone());
-            } else {
-                unfinished.insert(rule.clone());
             }
         }
     }
 
-    result
-}
-
-// Update needs to contain finished rules in order to complete rule
-fn predict_items(grammar: &Grammar, rules: &HashSet<LR0Item>) -> HashSet<LR0Item> {
-    let mut result = HashSet::new(); //rules.clone();
-    let mut current_set = rules.clone();
-
-    loop {
-        // Stores all updates for this round
-        //let mut update_set = HashSet::new();
-        //let mut eps_set = HashSet::new();
-        let mut update_set = HashSet::new();
-
-        // Check for epsilon rules
-        for item in current_set.iter() {
-            let rule = &grammar[item.rule_index];
-            if let Some((token, _)) = rule.body.get(item.dot) {
-                for (i, rule) in grammar.iter().enumerate() {
-                    if &rule.head == token {
-                        let item = LR0Item::new(i, 0);
-                        //if !result.contains(&item) {
-                        // eps_set.insert(item.clone());
-                        update_set.insert(item);
-                        //}
-                    }
-                }
-            }
-        }
-
-        for item in update_set.clone().iter() {
-            // Is one of the rules eps and therefore final?
-            if is_final(grammar, item) {
-                let symbol = &grammar[item.rule_index].head;
-                for i in rules
-                    .union(&result)
-                    .cloned()
-                    .collect::<HashSet<LR0Item>>()
-                    .iter()
-                {
-                    if !is_final(&grammar, &i) && grammar[i.rule_index].body[i.dot].0 == *symbol {
-                        update_set.insert(LR0Item::new(i.rule_index, i.dot + 1));
-                    }
-                }
-            }
-        }
-
-        if update_set.is_empty() {
-            break;
-        }
-
-        result = result.union(&update_set).cloned().collect();
-        current_set = update_set;
-    }
-    //result.difference(&rules).cloned().collect()
     result
 }
 
 pub fn predict(grammar: &Grammar, input: &HashSet<String>) -> HashSet<LR0Item> {
-    let new_rules = grammar
-        .iter()
-        .enumerate()
-        .filter(|(_, x)| input.contains(&x.head))
-        .map(|(i, _)| LR0Item::new(i, 0))
-        .collect::<HashSet<LR0Item>>();
-    predict_items(grammar, &new_rules)
-        .union(&new_rules)
-        .cloned()
-        .collect()
-}
-
-fn skip_epsilon(grammar: &Grammar, items: &HashSet<LR0Item>) -> HashSet<LR0Item> {
-    let allowed_indices: HashSet<usize> = items.iter().map(|x| x.rule_index).collect();
-    predict_items(grammar, items)
-        .iter()
-        .filter(|x| allowed_indices.contains(&x.rule_index))
-        .cloned()
-        .collect()
+    input.iter().flat_map(|x| find_derivations(grammar, x.clone())).collect()
 }
 
 fn scan(grammar: &Grammar, previous: &HashSet<LR0Item>, word: &str) -> HashSet<LR0Item> {
@@ -150,14 +132,11 @@ fn scan(grammar: &Grammar, previous: &HashSet<LR0Item>, word: &str) -> HashSet<L
         let rule = &grammar[item.rule_index];
         if let Some((token, _)) = &rule.body.get(item.dot) {
             if word == token {
-                result.insert(LR0Item::new(item.rule_index, item.dot + 1));
+                result.insert(skip_epsilon(grammar, LR0Item::new(item.rule_index, item.dot + 1)));
             }
         }
     }
-    skip_epsilon(grammar, &result)
-        .union(&result)
-        .cloned()
-        .collect()
+    result
 }
 
 pub fn parse(grammar: &Grammar, words: &Vec<&str>) -> bool {
@@ -177,11 +156,11 @@ pub fn parse(grammar: &Grammar, words: &Vec<&str>) -> bool {
 
         // Complete
         for k in (0..j).rev() {
-            let result = complete(grammar, &t[k][k], &t[k][j], false);
+            let result = complete(grammar, &t[k][k], &t[k][j], true);
 
             t[k][j] = t[k][j].union(&result).cloned().collect();
             for i in (0..k).rev() {
-                let result = complete(grammar, &t[i][k], &t[k][j], true);
+                let result = complete(grammar, &t[i][k], &t[k][j], false);
                 t[i][j] = t[i][j].union(&result).cloned().collect();
             }
 
@@ -194,9 +173,16 @@ pub fn parse(grammar: &Grammar, words: &Vec<&str>) -> bool {
             ts = ts.union(&t[i][j]).cloned().collect();
         }
         println!("Ts: {:?}", ts);
-        t[j][j] = predict_items(grammar, &ts);
+
+        t[j][j] = predict(grammar, &ts.iter()
+            .flat_map(|x| grammar[x.rule_index].body.get(x.dot))
+            .filter(|(_, term)| !*term)
+            .map(|(sym, _)| sym.clone()).collect());
+
         println!("t[{}, {}] = {:?}", j, j, t[j][j]);
     }
+
+    println!("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
 
     let start_symbol = &grammar[0].head;
     grammar

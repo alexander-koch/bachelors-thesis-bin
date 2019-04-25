@@ -20,7 +20,7 @@ impl State {
     }
 }
 
-fn is_final_state(grammar: &Rc<Grammar>, state: &State) -> bool {
+fn is_final_state(grammar: &Grammar, state: &State) -> bool {
     state.dot >= grammar[state.rule_index].body.len()
 }
 
@@ -34,7 +34,6 @@ pub struct EarleyParser {
 }
 
 impl EarleyParser {
-    // TODO prepend root rule
     pub fn new(grammar: &Rc<Grammar>) -> EarleyParser {
         EarleyParser {
             grammar: grammar.clone(),
@@ -198,7 +197,7 @@ pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> Stri
         "$ {} $",
         states
             .iter()
-            .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_dot(x.dot), x.start))
+            .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_tex_dot(x.dot), x.start))
             .collect::<Vec<String>>()
             .join(" $ \\\\ $ ")
     )
@@ -207,19 +206,10 @@ pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> Stri
 pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
     states
         .iter()
-        //.enumerate()
         .map(|set| format!("\\makecell[l]{{ {} }}", fmt_tex_state_set(grammar, set)))
         .collect::<Vec<String>>()
         .join("\n&")
 }
-
-/*
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SPPFNode {
-    pub rule_index: usize,
-    pub start: usize,
-    pub end: usize
-}*/
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SPPFKind {
@@ -227,6 +217,8 @@ pub enum SPPFKind {
     Symbol(String, usize, usize),
     //Intermediate(Rule, j, i)
 }
+
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SPPFNode {
@@ -237,16 +229,20 @@ pub struct SPPFNode {
 #[derive(Debug, Clone)]
 pub struct ForestBuilder {
     visited: HashSet<State>,
+    predecessors: HashMap<State, Vec<(State, usize)>>,
+    reductions: HashMap<State, Vec<(State, usize)>>
 }
 
 impl ForestBuilder {
     pub fn new() -> ForestBuilder {
         ForestBuilder {
             visited: HashSet::new(),
+            predecessors: HashMap::new(),
+            reductions: HashMap::new()
         }
     }
 
-    fn build_tree(&mut self, grammar: &Rc<Grammar>, node: &SPPFNode, state: &State) {
+    fn build_tree(&mut self, grammar: &Grammar, node: &SPPFNode, state: &State) {
         debug!("State: {}", grammar[state.rule_index].fmt_dot(state.dot));
 
         self.visited.insert(state.clone());
@@ -255,10 +251,14 @@ impl ForestBuilder {
         if state.dot > 0 {
             // Index for the previous symbol
             let index = state.dot - 1;
-            if rule.body[index].1 {
+            let (sym, term) = &rule.body[index];
+            if *term {
                 // Terminal symbol
                 if index == 0 {
                     // Last symbol
+                    /*SPPFNode {
+                        kind: SPPFKind::Symbol(sym, )
+                    }*/
 
                 } else {
 
@@ -275,12 +275,50 @@ impl ForestBuilder {
         }
     }
 
-    pub fn build_forest(&mut self, grammar: &Rc<Grammar>, states: &StateSetList) {
+    pub fn build_forest(&mut self, grammar: &Grammar, states: &StateSetList) {
         let n = states.len() - 1;
         let start_node = SPPFNode {
             kind: SPPFKind::Symbol(grammar[0].head.clone(), 0, n),
             family: vec![],
         };
+
+        // Calculate initial pointers
+        for i in 1..states.len() {
+            
+            // For each (A -> alpha ai * beta, j)
+            // Look for (A -> alpha * ai beta, j) in S_(i-1)
+            for curr in states[i].iter() {
+                // Completer
+                if is_final_state(grammar, curr) {
+                    let base_rule = &grammar[curr.rule_index];
+                    for s in states[curr.start].iter() {
+                        let rule = &grammar[s.rule_index];
+                        if !is_final_state(&grammar, s) && rule.body[s.dot].0 == base_rule.head {
+                            let q = State::new(s.rule_index, s.dot + 1, s.start);
+                            
+                            if base_rule.body.is_empty() {
+                                self.reductions.entry(q).or_insert_with(Vec::new).push((curr.clone(), curr.start));
+                            } else {
+                                self.predecessors.entry(q).or_insert_with(Vec::new).push((s.clone(), s.start));
+                            }
+                        }
+                    }
+                }
+
+                // Scan
+                if curr.dot > 1 {
+                    for prev in states[i-1].iter()
+                        .filter(|x| x.start == curr.start 
+                            && x.rule_index == curr.rule_index
+                            && x.dot == curr.dot-1) {
+                        self.predecessors.entry(prev.clone()).or_insert_with(Vec::new).push((curr.clone(), i-1));
+                    }
+                }
+            }
+        }
+
+        println!("Pred: {:?}", self.predecessors);
+        println!("Redu: {:?}", self.reductions);
 
         let start_rule: &Rule = &grammar[0];
         for state in states[n]

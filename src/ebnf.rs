@@ -38,6 +38,20 @@ impl Rule {
 
         format!("{} -> {}{}", self.head, rhs, last)
     }
+
+    pub fn fmt_tex_dot(&self, dot: usize) -> String {
+        let rhs = self
+            .body
+            .iter()
+            .enumerate()
+            .map(|(i, x)| if i == dot { format!("\\bigdot {}", x.0) } else { x.0.clone() })
+            .collect::<Vec<String>>()
+            .join(" ");
+
+        let last = if dot >= self.body.len() { " \\bigdot" } else { "" };
+
+        format!("{} \\rightarrow {}{}", self.head, rhs, last)
+    }
 }
 
 impl fmt::Display for Rule {
