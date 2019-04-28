@@ -17,7 +17,7 @@ pub struct Rule {
 
 fn terminalize(s: &str, t: bool) -> String {
     if t {
-        format!("\"{}\"", s)
+        format!("'{}'", s)
     } else {
         s.to_owned()
     }

@@ -455,12 +455,14 @@ impl ForestBuilder {
             }
         } else if rule.body.is_empty() {
             //println!("Rule 0");
-            println!("Empty: {}", rule);
+            println!("Empty: {}, start: {:?}", rule, self.nodes[start_node]);
             let v = self.make_node(SPPFKind::Symbol(rule.head.clone(), set_index, set_index));
             let eps = self.make_node(SPPFKind::Epsilon);
             self.nodes[v].add_family_node(FamilyNode::Node(eps));
 
-            self.nodes[start_node].add_family_node(FamilyNode::Node(v));
+            if start_node != v {
+                self.nodes[start_node].add_family_node(FamilyNode::Node(v));
+            }
         }
     }
 
