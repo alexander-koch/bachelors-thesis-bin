@@ -224,14 +224,79 @@ pub enum SPPFKind {
     Intermediate(LR0Item, usize, usize),
 }
 
+impl SPPFKind {
+    fn fmt(&self, grammar: &Grammar) -> String {
+        match self {
+            SPPFKind::Epsilon => "eps".to_owned(),
+            SPPFKind::Symbol(a, i, j) => {
+                format!("{}, {}, {}", a, i, j)
+            },
+            SPPFKind::Intermediate(item, i, j) => {
+                format!("{}, {}, {}", grammar[item.rule_index].fmt_dot(item.dot), i, j)
+            }
+        }
+    }
+}
+
 use std::collections::HashMap;
 use std::collections::BTreeSet;
+use std::cmp::Ordering;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Clone, Hash)]
 pub enum FamilyNode {
     Node(usize),
     Group(usize, usize)
 }
+
+impl Ord for FamilyNode {
+    fn cmp(&self, other: &FamilyNode) -> Ordering {
+        //self.height.cmp(&other.height)
+        match self {
+            FamilyNode::Node(s) => match other {
+                FamilyNode::Node(x) => s.cmp(x),
+                FamilyNode::Group(x, _) => s.cmp(x) 
+            },
+            FamilyNode::Group(w, v) => match other {
+                FamilyNode::Node(s) => w.cmp(s),
+                FamilyNode::Group(x, y) => {
+                    if w == x && v == y || w == y && v == x {
+                        Ordering::Equal
+                    } else {
+                        w.cmp(x).then(v.cmp(y))
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl PartialOrd for FamilyNode {
+    fn partial_cmp(&self, other: &FamilyNode) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for FamilyNode {
+    fn eq(&self, other: &FamilyNode) -> bool {
+        match self {
+            FamilyNode::Node(s) => {
+                match other {
+                    FamilyNode::Node(d) => s == d,
+                    FamilyNode::Group(_, _) => false
+                }
+            },
+            FamilyNode::Group(w, v) => {
+                match other {
+                    FamilyNode::Node(_) => false,
+                    FamilyNode::Group(x, y) => {
+                        x == w && y == v || y == w && x == v
+                    } 
+                }
+            }
+        }
+    }
+}
+impl Eq for FamilyNode {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SPPFNode {
@@ -248,14 +313,22 @@ impl SPPFNode {
     }
 
     pub fn add_family_node(&mut self, node: FamilyNode) {
+        // if (x, y) is in the set then (y, x) is already
+        // Groups should be symmetric
+        if self.family.contains(&node) {
+            return
+        }
+
         if self.family.len() == 2 {
+            println!("{:?} to add {:?}", self.family, node);
             let mut idx = [0; 2];
-            for (i, node) in self.family.iter().enumerate() {
-                match node {
+            for (i, n) in self.family.iter().enumerate() {
+                match n {
                     FamilyNode::Node(s) => idx[i] = *s,
-                    FamilyNode::Group(_, _) => panic!("Cannot group two groups") 
+                    FamilyNode::Group(_, _) => panic!("Group error")
                 }
             }
+
             self.family.clear();
             self.family.insert(FamilyNode::Group(idx[0], idx[1]));
             self.family.insert(node);
@@ -263,8 +336,12 @@ impl SPPFNode {
             match node {
                 FamilyNode::Node(_) => self.family.insert(node),
                 FamilyNode::Group(w, v) => {
-                    self.family.insert(FamilyNode::Node(w));
-                    self.family.insert(FamilyNode::Node(v))
+                    if self.family.len() > 0 {
+                        self.family.insert(node)
+                    } else {
+                        self.family.insert(FamilyNode::Node(w));
+                        self.family.insert(FamilyNode::Node(v))
+                    }
                 }
             };
         }
@@ -378,7 +455,10 @@ impl ForestBuilder {
             }
         } else if rule.body.is_empty() {
             //println!("Rule 0");
+            println!("Empty: {}", rule);
             let v = self.make_node(SPPFKind::Symbol(rule.head.clone(), set_index, set_index));
+            let eps = self.make_node(SPPFKind::Epsilon);
+            self.nodes[v].add_family_node(FamilyNode::Node(eps));
 
             self.nodes[start_node].add_family_node(FamilyNode::Node(v));
         }
@@ -391,7 +471,7 @@ impl ForestBuilder {
         let mut reductions = HashMap::new();
         let mut predecessors = HashMap::new();
 
-        for i in 1..states.len() {
+        for i in 0..states.len() {
             for t in states[i].iter() {
 
                 if is_final_state(grammar, t) {
@@ -418,7 +498,7 @@ impl ForestBuilder {
                             && x.rule_index == t.rule_index
                             && x.dot == t.dot-1
                             && grammar[x.rule_index].body.get(x.dot).map(|x| x.1).unwrap_or(false)) {
-                        predecessors.entry((prev.clone(), i-1)).or_insert_with(Vec::new).push((t.clone(), i-1));
+                        predecessors.entry((t.clone(), i)).or_insert_with(Vec::new).push((prev.clone(), i-1));
                     }
                 }
             }
@@ -427,8 +507,8 @@ impl ForestBuilder {
         self.reductions = Rc::new(reductions);
         self.predecessors = Rc::new(predecessors);
 
-        /*println!("Pred: {:?}", self.predecessors);
-        println!("Redu: {:?}", self.reductions);
+        //println!("Pred: {:?}", self.predecessors);
+        //println!("Redu: {:?}", self.reductions);
 
         println!("Reductions");
         for ((k, i), v) in self.reductions.iter() {
@@ -442,7 +522,7 @@ impl ForestBuilder {
             for (s, n) in v.iter() {
                 println!("({}, {}) from E{} ->{} ({}, {})", grammar[k.rule_index].fmt_dot(k.dot), k.start, i, n, grammar[s.rule_index].fmt_dot(s.dot), s.start);
             }
-        }*/
+        }
 
         let start_rule: &Rule = &grammar[0];
         for state in states[n]
@@ -454,10 +534,35 @@ impl ForestBuilder {
 
         //self.nodes.insert(start_node.clone());
 
-        //println!("SPPFNodes: {:?}", self.nodes);
+       //‚ println!("SPPFNodes: {:?}", self.nodes);
 
         for (i, node) in self.nodes.iter().enumerate() {
-            println!("({}) = {:?}", i, node);
+            let style = match node.kind {
+                SPPFKind::Intermediate(_, _, _) => "shape=box",
+                _ => "shape=box, style=rounded"
+            };
+
+            println!("{} [label=\"{}\", {}];", i, node.kind.fmt(grammar), style);
+        }
+
+        let mut j = self.nodes.len();
+        for (i, node) in self.nodes.iter().enumerate() {
+           // println!("({}) = {:?}", i, node);
+
+            //let node_name = node.kind.fmt(grammar);
+
+            for child in &node.family {
+                match child {
+                    FamilyNode::Node(s) => println!("{} -> {};", i, s),
+                    FamilyNode::Group(w, v) => {
+                        println!("{} [shape=circle, fixedsize=true, width=0.15, height=0.15, label=\"\"]", j);
+                        println!("{} -> {};", i, j);
+                        println!("{} -> {};", j, w);
+                        println!("{} -> {};", j, v);
+                        j += 1;
+                    }
+                }
+            }
         }
 
         //println!("Start: {:?}", self.nodes[start_node]);
