@@ -3,6 +3,8 @@ use log::{debug, trace};
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::lr::LR0Item;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct State {
     pub rule_index: usize,
@@ -213,119 +215,258 @@ pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> S
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SPPFKind {
+    Epsilon,
+
     /// (x, j, i) - x symbol, j left extent, i right extent
     Symbol(String, usize, usize),
-    //Intermediate(Rule, j, i)
+
+    /// (B ::= a * B b, i, j), 
+    Intermediate(LR0Item, usize, usize),
 }
 
 use std::collections::HashMap;
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub enum FamilyNode {
+    Node(usize),
+    Group(usize, usize)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SPPFNode {
     pub kind: SPPFKind,
-    pub family: Vec<SPPFNode>,
+    pub family: BTreeSet<FamilyNode>
+}
+
+impl SPPFNode {
+    pub fn eps() -> SPPFNode {
+        SPPFNode {
+            kind: SPPFKind::Epsilon,
+            family: BTreeSet::new()
+        }
+    }
+
+    pub fn add_family_node(&mut self, node: FamilyNode) {
+        if self.family.len() == 2 {
+            let mut idx = [0; 2];
+            for (i, node) in self.family.iter().enumerate() {
+                match node {
+                    FamilyNode::Node(s) => idx[i] = *s,
+                    FamilyNode::Group(_, _) => panic!("Cannot group two groups") 
+                }
+            }
+            self.family.clear();
+            self.family.insert(FamilyNode::Group(idx[0], idx[1]));
+            self.family.insert(node);
+        } else {
+            match node {
+                FamilyNode::Node(_) => self.family.insert(node),
+                FamilyNode::Group(w, v) => {
+                    self.family.insert(FamilyNode::Node(w));
+                    self.family.insert(FamilyNode::Node(v))
+                }
+            };
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ForestBuilder {
-    visited: HashSet<State>,
-    predecessors: HashMap<State, Vec<(State, usize)>>,
-    reductions: HashMap<State, Vec<(State, usize)>>
+    visited: HashSet<(State, usize)>,
+    predecessors: Rc<HashMap<(State, usize), Vec<(State, usize)>>>,
+    reductions: Rc<HashMap<(State, usize), Vec<(State, usize)>>>,
+    
+    known: HashMap<SPPFKind, usize>,
+    nodes: Vec<SPPFNode>,
 }
 
 impl ForestBuilder {
     pub fn new() -> ForestBuilder {
         ForestBuilder {
             visited: HashSet::new(),
-            predecessors: HashMap::new(),
-            reductions: HashMap::new()
+            predecessors: Rc::new(HashMap::new()),
+            reductions: Rc::new(HashMap::new()),
+            known: HashMap::new(),
+            nodes: Vec::new()
         }
     }
 
-    fn build_tree(&mut self, grammar: &Grammar, node: &SPPFNode, state: &State) {
-        debug!("State: {}", grammar[state.rule_index].fmt_dot(state.dot));
+    fn make_node(&mut self, kind: SPPFKind) -> usize {
+        if let Some(idx) = self.known.get(&kind) {
+            *idx
+        } else {
+            let idx = self.nodes.len();
+            let node = SPPFNode {
+                kind: kind.clone(),
+                family: BTreeSet::new()
+            };
+            self.nodes.push(node.clone());
+           // println!("Creating node: u{} = {:?}", idx, node);
+            //let idx = self.nodes.len()-1;
+            self.known.insert(kind, idx);
+            idx
+        }
+    }
 
-        self.visited.insert(state.clone());
+    fn build_tree(&mut self, grammar: &Grammar, start_node: usize, set_index: usize, state: &State) {
+        if let Some(_) = self.visited.get(&(state.clone(), set_index)) {
+            return
+        } else {
+            self.visited.insert((state.clone(), set_index));
+        }
+
+        //println!("E{}: State: ({}, {})", set_index, grammar[state.rule_index].fmt_dot(state.dot), state.start);
+
+        // Current rule and index
         let rule = &grammar[state.rule_index];
 
         if state.dot > 0 {
             // Index for the previous symbol
             let index = state.dot - 1;
             let (sym, term) = &rule.body[index];
-            if *term {
-                // Terminal symbol
-                if index == 0 {
-                    // Last symbol
-                    /*SPPFNode {
-                        kind: SPPFKind::Symbol(sym, )
-                    }*/
 
+            if index == 0 {
+                // Last symbol
+                if *term {
+                    //println!("Rule 1");
+                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index-1, set_index));
+                    self.nodes[start_node].add_family_node(FamilyNode::Node(v));
                 } else {
+                    //println!("Rule 2");
+                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), state.start, set_index));
 
+                    if let Some(vec) = self.reductions.clone().get(&(state.clone(), set_index)) {
+                        for q in vec.iter().filter(|(_, j)| *j == state.start).map(|(x, _)| x) {
+                            self.build_tree(grammar, v, set_index, q);
+                        }
+                    }
+                    self.nodes[start_node].add_family_node(FamilyNode::Node(v));
                 }
             } else {
-                // Non-terminal symbol
-                if index == 0 {
-                    // Last symbol
+                if *term {
+                    //println!("Rule 3");
+                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index-1, set_index));
+                    let w = self.make_node(SPPFKind::Intermediate(LR0Item::new(state.rule_index, state.dot-1), state.start, set_index-1));
 
+                    if let Some(vec) = self.predecessors.clone().get(&(state.clone(), set_index)) {
+                        for (q, i) in vec.iter().filter(|(_, j)| *j == set_index-1) {//.map(|(x, _)| x) {
+                            self.build_tree(grammar, w, *i, q);
+                        }
+                    }
+
+                    self.nodes[start_node].add_family_node(FamilyNode::Group(w, v))
                 } else {
+                    //println!("Rule 4");
+                    if let Some(vec) = self.reductions.clone().get(&(state.clone(), set_index)) {
+                        for (q, l) in vec {
+                            //println!("--- {:?} {:?} ", q, l);
+                            let v = self.make_node(SPPFKind::Symbol(sym.clone(), *l, set_index));
+                            self.build_tree(grammar, v, set_index, q);
 
+                            let w = self.make_node(SPPFKind::Intermediate(LR0Item::new(state.rule_index, state.dot-1), state.start, *l));
+                            if let Some(vec) = self.predecessors.clone().get(&(state.clone(), set_index)) {
+                                for (p, i) in vec.iter().filter(|(_, j)| *j == *l) {//.map(|(x, _)| x) {
+                                    self.build_tree(grammar, w, *i, p);
+                                }
+                            }
+
+                            self.nodes[start_node].add_family_node(FamilyNode::Group(w, v));
+                        }
+                    }
                 }
             }
+        } else if rule.body.is_empty() {
+            //println!("Rule 0");
+            let v = self.make_node(SPPFKind::Symbol(rule.head.clone(), set_index, set_index));
+
+            self.nodes[start_node].add_family_node(FamilyNode::Node(v));
         }
     }
 
     pub fn build_forest(&mut self, grammar: &Grammar, states: &StateSetList) {
         let n = states.len() - 1;
-        let start_node = SPPFNode {
-            kind: SPPFKind::Symbol(grammar[0].head.clone(), 0, n),
-            family: vec![],
-        };
+        let start_node = self.make_node(SPPFKind::Symbol(grammar[0].head.clone(), 0, n));
 
-        // Calculate initial pointers
+        let mut reductions = HashMap::new();
+        let mut predecessors = HashMap::new();
+
         for i in 1..states.len() {
-            
-            // For each (A -> alpha ai * beta, j)
-            // Look for (A -> alpha * ai beta, j) in S_(i-1)
-            for curr in states[i].iter() {
-                // Completer
-                if is_final_state(grammar, curr) {
-                    let base_rule = &grammar[curr.rule_index];
-                    for s in states[curr.start].iter() {
-                        let rule = &grammar[s.rule_index];
-                        if !is_final_state(&grammar, s) && rule.body[s.dot].0 == base_rule.head {
-                            let q = State::new(s.rule_index, s.dot + 1, s.start);
-                            
-                            if base_rule.body.is_empty() {
-                                self.reductions.entry(q).or_insert_with(Vec::new).push((curr.clone(), curr.start));
-                            } else {
-                                self.predecessors.entry(q).or_insert_with(Vec::new).push((s.clone(), s.start));
+            for t in states[i].iter() {
+
+                if is_final_state(grammar, t) {
+                    let t_rule = &grammar[t.rule_index];
+                    for q in states[t.start].iter() {
+                        if let Some((token, term)) = grammar[q.rule_index].body.get(q.dot) {
+                            if !is_final_state(&grammar, q) && !term && *token == t_rule.head {
+                                let p = State::new(q.rule_index, q.dot + 1, q.start);
+                                
+                                reductions.entry((p.clone(), i)).or_insert_with(Vec::new).push((t.clone(), t.start));
+                                // Tau != eps
+                                if q.dot > 0 {
+                                    predecessors.entry((p, i)).or_insert_with(Vec::new).push((q.clone(), t.start));
+                                }
                             }
                         }
                     }
                 }
 
                 // Scan
-                if curr.dot > 1 {
+                if t.dot > 1 {
                     for prev in states[i-1].iter()
-                        .filter(|x| x.start == curr.start 
-                            && x.rule_index == curr.rule_index
-                            && x.dot == curr.dot-1) {
-                        self.predecessors.entry(prev.clone()).or_insert_with(Vec::new).push((curr.clone(), i-1));
+                        .filter(|x| x.start == t.start 
+                            && x.rule_index == t.rule_index
+                            && x.dot == t.dot-1
+                            && grammar[x.rule_index].body.get(x.dot).map(|x| x.1).unwrap_or(false)) {
+                        predecessors.entry((prev.clone(), i-1)).or_insert_with(Vec::new).push((t.clone(), i-1));
                     }
                 }
             }
         }
 
-        println!("Pred: {:?}", self.predecessors);
+        self.reductions = Rc::new(reductions);
+        self.predecessors = Rc::new(predecessors);
+
+        /*println!("Pred: {:?}", self.predecessors);
         println!("Redu: {:?}", self.reductions);
+
+        println!("Reductions");
+        for ((k, i), v) in self.reductions.iter() {
+            for (s, n) in v.iter() {
+                println!("({}, {}) from E{} ->{} ({}, {})", grammar[k.rule_index].fmt_dot(k.dot), k.start, i, n, grammar[s.rule_index].fmt_dot(s.dot), s.start);
+            }
+        }
+
+        println!("Predecessors");
+        for ((k, i), v) in self.predecessors.iter() {
+            for (s, n) in v.iter() {
+                println!("({}, {}) from E{} ->{} ({}, {})", grammar[k.rule_index].fmt_dot(k.dot), k.start, i, n, grammar[s.rule_index].fmt_dot(s.dot), s.start);
+            }
+        }*/
 
         let start_rule: &Rule = &grammar[0];
         for state in states[n]
             .iter()
-            .filter(|x| is_final_state(grammar, x) && grammar[x.rule_index].head == start_rule.head)
+            .filter(|x| is_final_state(grammar, x) && grammar[x.rule_index].head == start_rule.head && x.start == 0)
         {
-            self.build_tree(grammar, &start_node, state);
+            self.build_tree(grammar, start_node, n, state);
         }
+
+        //self.nodes.insert(start_node.clone());
+
+        //println!("SPPFNodes: {:?}", self.nodes);
+
+        for (i, node) in self.nodes.iter().enumerate() {
+            println!("({}) = {:?}", i, node);
+        }
+
+        //println!("Start: {:?}", self.nodes[start_node]);
+
+        /*/or fam in start_node.family {
+            println!("Sub: {:?}", fam.kind);
+            for fam in fam.family {
+                println!("--- {:?}", fam.kind);
+            }
+        }*/
     }
 }

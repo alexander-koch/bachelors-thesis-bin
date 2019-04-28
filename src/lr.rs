@@ -2,6 +2,9 @@ use crate::ebnf::Grammar;
 use crate::ll::FFSets;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use std::collections::hash_map::Entry;
+use std::fmt;
+
 use log::debug;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -29,6 +32,16 @@ pub enum Action {
     Shift(usize),
     Reduce(usize),
     Acc,
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Action::Shift(s) => write!(f, "s{}", s),
+            Action::Reduce(r) => write!(f, "r{}", r),
+            Action::Acc => write!(f, "acc")
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,11 +73,8 @@ impl LRParser for FFSets {
                 let rule = &gr[item.rule_index];
 
                 // Get the current non-terminal we are looking at
-                if let Some((current, term)) = rule.body.get(item.dot) {
-                    // Assure that it is a non-terminal
-                    if *term {
-                        continue;
-                    }
+                if let Some(current) = rule.body.get(item.dot).filter(|x| !x.1).map(|x| &x.0) {
+
                     // Get all follow-up tokens
                     let mut tokens = rule.body[item.dot + 1..].to_vec();
                     tokens.push((a.clone(), true));
@@ -185,11 +195,17 @@ impl LRParser for FFSets {
         let mut goto_table = vec![HashMap::new(); qs.len()];
 
         for (i, action, sym) in actions {
-            action_table[i].insert(sym, action);
+            match action_table[i].entry(sym.clone()) {
+                Entry::Occupied(o) => panic!("LR shift/reduce conflict {}:{} = {}/{}", i, sym, o.get(), action),
+                Entry::Vacant(v) => v.insert(action)
+            };
         }
 
         for (i, action, sym) in gotos {
-            goto_table[i].insert(sym, action);
+            match goto_table[i].entry(sym.clone()) {
+                Entry::Occupied(o) => panic!("LR goto conflict {}:{} = {}/{}", i, sym, o.get(), action),
+                Entry::Vacant(v) => v.insert(action)
+            };
         }
 
         // debug!("states: {:?}", qs);
@@ -215,7 +231,7 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
         let word = words[i];
         let state = *stack.last().unwrap();
 
-        println!("State: {}, Word: {}", state, word);
+        //println!("State: {:?}, Word: {}", stack, word);
 
         match table.action_table[state].get(word) {
             Some(Action::Shift(s)) => {
@@ -229,7 +245,7 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
                 stack.truncate(stack.len() - k);
 
                 let rule = &grammar[*i];
-                println!("Apply: {}", rule);
+                println!("Apply: ({}) {}", *i, rule);
 
                 stack.push(table.goto_table[*stack.last().unwrap()][&rule.head]);
             }

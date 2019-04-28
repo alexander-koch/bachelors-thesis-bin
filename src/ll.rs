@@ -1,7 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
+use std::collections::hash_map::Entry;
+
 use crate::ebnf::Grammar;
+
+pub type LLTable = HashMap<String, HashMap<String, usize>>;
 
 #[derive(Debug, Clone)]
 pub struct FFSets {
@@ -50,6 +54,8 @@ impl FFSets {
             val.clone()
         } else {
             let gr = self.grammar.clone();
+            self.known_firsts.insert(symbol.to_owned(), HashSet::new());
+
             let first_set = gr
                 .iter()
                 .filter(|x| x.head == symbol)
@@ -131,7 +137,7 @@ impl FFSets {
     //     Add A -> eps to M[A, b] for each terminal b in FOLLOW(A)
     //     If $ is in FOLLOW(A) then
     //       Add A -> alpha to M[A, $]
-    pub fn construct_ll_table(&mut self) -> HashMap<String, HashMap<String, usize>> {
+    pub fn construct_ll_table(&mut self) -> LLTable {
         let mut table = HashMap::new();
 
         let gr = self.grammar.clone();
@@ -143,10 +149,10 @@ impl FFSets {
             }
 
             for symbol in set.iter() {
-                table
-                    .entry(rule.head.clone())
-                    .or_insert_with(HashMap::new)
-                    .insert(symbol.clone(), i);
+                match table.entry(rule.head.clone()).or_insert_with(HashMap::new).entry(symbol.clone()) {
+                    Entry::Occupied(o) => panic!("LL conflict, {}[\"{}\"] = {}/{}", rule.head, symbol, o.get(), i),
+                    Entry::Vacant(v) => v.insert(i)
+                };
             }
         }
         table
@@ -166,13 +172,16 @@ pub fn parse_ll(
     let mut i = 0;
     loop {
         //println!("Current word: {}, stack: {:?}", words[i], stack);
+        if i >= words.len() {
+            return false
+        }
 
         if let Some((symbol, term)) = stack.last() {
             if *term {
                 if &words[i] != symbol {
-                    return false;
-                } else if words[i] == "$" {
-                    return true;
+                    return false
+                } else if words[i] == "$" && *symbol == "$" {
+                    return true
                 } else {
                     stack.pop();
                     i += 1;
@@ -180,14 +189,16 @@ pub fn parse_ll(
             } else {
                 if let Some(index) = table.get(*symbol).and_then(|x| x.get(words[i])) {
                     stack.pop();
-                    println!("Apply: {}", grammar[*index]);
+                    println!("Apply: ({}) {}", *index, grammar[*index]);
                     for (symbol, term) in grammar[*index].body.iter().rev() {
                         stack.push((&symbol, *term));
                     }
                 } else {
-                    return false;
+                    return false
                 }
             }
+        } else {
+            return false
         }
     }
 }

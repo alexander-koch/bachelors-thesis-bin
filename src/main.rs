@@ -119,6 +119,7 @@ fn main() {
         let readline = rl.readline(">> ");
         match readline {
             Ok(line) => {
+                rl.add_history_entry(line.as_ref());
                 let words: Vec<&str> = line.split_whitespace().collect();
 
                 println!("{:?}", words);
@@ -127,8 +128,8 @@ fn main() {
                     let states = earley_parser.as_mut().unwrap().analyze(&words);
                     println!("{}", earley::fmt_state_set_list(&grammar, &states));
 
-                    //let mut fb = earley::ForestBuilder::new();
-                    //fb.build_forest(&grammar, &states);
+                    let mut fb = earley::ForestBuilder::new();
+                    fb.build_forest(&grammar, &states);
 
                     EarleyParser::accepts(&states, &words)
                 } else if args.cmd_ll1 {

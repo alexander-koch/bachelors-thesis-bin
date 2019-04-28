@@ -28,13 +28,21 @@ pub fn fmt_tex_lr0_matrix(grammar: &Grammar, t: Vec<Vec<HashSet<LR0Item>>>) -> S
 }
 
 fn skip_epsilon(grammar: &Grammar, item: LR0Item) -> LR0Item {
+    let mut input = HashSet::new();
+    if let Some((token, _)) = grammar[item.rule_index].body.get(item.dot).filter(|(_, term)| !term) {
+        input.insert(token.clone());
+    }
 
-    /*let mut input = HashSet::new();
-    if let Some((token, term)) = grammar[item.rule_index].body.get(item.dot)
+    let mut p = predict(grammar, &input);
+    p.insert(item.clone());
+    let c = complete(grammar, &p, &p, false);
 
-    input.insert()
+    c.into_iter()
+        .filter(|x| x.rule_index == item.rule_index && x.dot > item.dot)
+        .max_by_key(|x| x.dot)
+        .unwrap_or(item)
 
-    predict(grammar, input: &HashSet<String>)*/
+    // item
 
     // TODO
 
@@ -45,7 +53,7 @@ fn skip_epsilon(grammar: &Grammar, item: LR0Item) -> LR0Item {
         .cloned()
         .collect()*/
 
-    item
+    //item
 }
 
 // B =>* C strict
@@ -182,7 +190,7 @@ pub fn parse(grammar: &Grammar, words: &Vec<&str>) -> bool {
         println!("t[{}, {}] = {:?}", j, j, t[j][j]);
     }
 
-    println!("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
+    //println!("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
 
     let start_symbol = &grammar[0].head;
     grammar
