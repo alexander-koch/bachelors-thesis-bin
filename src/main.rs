@@ -1,6 +1,7 @@
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::rc::Rc;
+use std::collections::HashSet;
 
 pub mod ebnf;
 pub mod lexer;
@@ -8,13 +9,11 @@ pub mod lexer;
 pub mod harrison;
 pub mod ll;
 pub mod lr;
+pub mod sppf;
+pub mod earley;
 
 use lr::LRParser;
-
-pub mod earley;
 use earley::EarleyParser;
-
-use std::collections::HashSet;
 
 use docopt::Docopt;
 use serde::Deserialize;
@@ -128,8 +127,11 @@ fn main() {
                     let states = earley_parser.as_mut().unwrap().analyze(&words);
                     println!("{}", earley::fmt_state_set_list(&grammar, &states));
 
-                    let mut fb = earley::ForestBuilder::new();
-                    fb.build_forest(&grammar, &states);
+                    let mut fb = sppf::ForestBuilder::new();
+                    let forest = fb.build_forest(&grammar, &states);
+                    if let Err(x) = sppf::render_sppf("graph.dot", &grammar, &forest) {
+                        println!("{}", x);
+                    }
 
                     EarleyParser::accepts(&states, &words)
                 } else if args.cmd_ll1 {
