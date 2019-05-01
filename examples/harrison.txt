@@ -1,6 +1,6 @@
+R = S .
 S = A B .
 A = .
 B = C D C .
 C = .
-D = "a" E .
-E = .
+D = "a" .

@@ -14,6 +14,7 @@ pub mod earley;
 
 use lr::LRParser;
 use earley::EarleyParser;
+use harrison::HarrisonParser;
 
 use docopt::Docopt;
 use serde::Deserialize;
@@ -95,6 +96,12 @@ fn main() {
         None
     };
 
+    let mut harrison_parser = if args.cmd_harrison {
+        Some(HarrisonParser::new(&grammar))
+    } else {
+        None
+    };
+
     let mut ll_table = if args.cmd_ll1 {
         let mut ff = ll::FFSets::new(&grammar);
         let table = ff.construct_ll_table();
@@ -139,7 +146,7 @@ fn main() {
                 } else if args.cmd_lr1 {
                     lr::parse_lr(&grammar, lr_table.as_mut().unwrap(), &words)
                 } else {
-                    harrison::parse(&grammar, &words)
+                    harrison_parser.as_mut().unwrap().accepts(&words)
                 };
 
                 println!("w in L(G): {}", result);

@@ -211,3 +211,47 @@ pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> S
         .join("\n&")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ebnf;
+
+    fn earley_recognize(path: &str, words: &Vec<&str>) -> bool {
+        let grammar = ebnf::parse_grammar(path);
+        assert!(grammar.is_ok());
+        let grammar = Rc::new(grammar.ok().unwrap());
+        let mut parser = EarleyParser::new(&grammar);
+        let states = parser.analyze(words);
+        EarleyParser::accepts(&states, words)
+    }
+
+    #[test]
+    fn test_harrison1_valid() {
+        assert!(earley_recognize("examples/harrison.txt", &vec!["a"]));
+    }
+
+    #[test]
+    fn test_harrison1_invalid() {
+        assert!(!earley_recognize("examples/harrison.txt", &vec!["b"]));
+    }
+
+    #[test]
+    fn test_harrison2() {
+        assert!(earley_recognize("examples/harrison2.txt", &vec!["a", "+", "a", "*", "a"]));
+    }
+
+    #[test]
+    fn test_harrison2_invalid() {
+        assert!(!earley_recognize("examples/harrison2.txt", &vec!["a", "+", "+"]));
+    }
+
+    #[test]
+    fn test_parens_valid() {
+        assert!(earley_recognize("examples/parens.txt", &vec!["(", "(", ")", ")"]));
+    }
+
+    #[test]
+    fn test_parens_invalid() {
+        assert!(!earley_recognize("examples/parens.txt", &vec!["(", "(", "(", "("]));
+    }
+}
