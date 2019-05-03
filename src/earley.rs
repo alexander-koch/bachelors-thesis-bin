@@ -246,12 +246,22 @@ mod tests {
     }
 
     #[test]
-    fn test_parens_valid() {
-        assert!(earley_recognize("examples/parens.txt", &vec!["(", "(", ")", ")"]));
+    fn test_dyck1_valid() {
+        assert!(earley_recognize("examples/dyck1.txt", &vec!["(", "(", ")", ")"]));
     }
 
     #[test]
-    fn test_parens_invalid() {
-        assert!(!earley_recognize("examples/parens.txt", &vec!["(", "(", "(", "("]));
+    fn test_dyck1_invalid() {
+        assert!(!earley_recognize("examples/dyck1.txt", &vec!["(", "(", "(", "("]));
+    }
+
+    #[test]
+    fn test_even_zeros_valid() {
+        assert!(earley_recognize("examples/even_zeros.txt", &vec!["1", "0", "0", "1"]));
+    }
+
+    #[test]
+    fn test_even_zeros_invalid() {
+        assert!(!earley_recognize("examples/even_zeros.txt", &vec!["1", "1", "0", "1"]));
     }
 }

@@ -5,6 +5,8 @@ use crate::ll::FFSets;
 use crate::ebnf::{Grammar, Rule};
 use crate::lr::{is_final, LR0Item};
 
+use log::debug;
+
 pub fn fmt_tex_lr0_set(grammar: &Grammar, states: &HashSet<LR0Item>) -> String {
     format!(
         "$ {} $",
@@ -128,26 +130,33 @@ impl HarrisonParser {
         result
     }
 
-    /// Advances a given LR(0)-item if the following item(s) is derivable to epsilon
+    /// Returns all advancements for a given LR(0)-item
+    /// if the following symbol is derivable to epsilon
     /// 
     /// # Arguments
     /// 
     /// * `item` - The item to be skipped over 
-    fn skip_epsilon(&mut self, item: LR0Item) -> LR0Item {
+    fn skip_epsilon(&mut self, item: LR0Item) -> HashSet<LR0Item> {
         let max = self.grammar[item.rule_index].body.len();
+        let mut result = HashSet::new();
+        result.insert(item.clone());
+
         for i in item.dot..max {
             if let Some((sym, term)) = self.grammar[item.rule_index].body.get(i) {
                 if !term {
-                    if !self.ff.first(sym).contains("") {
-                        return LR0Item::new(item.rule_index, i)                     
+                    if self.ff.first(sym).contains("") {
+                        result.insert(LR0Item::new(item.rule_index, i+1));     
+                    } else {
+                        break
                     }
                 } else {
-                    return LR0Item::new(item.rule_index, i)
+                    break
                 }
+            } else {
+                break
             }
         }
-
-        LR0Item::new(item.rule_index, max)
+        result
     }
 
     /// Completes items in Q by using the finished ones in R
@@ -194,7 +203,7 @@ impl HarrisonParser {
                 if let Some((token, term)) = &gr[unfinished_item.rule_index].body.get(unfinished_item.dot) {
                     // If the tokens match
                     if !*term && *token == terminated_item {
-                        result.insert(self.skip_epsilon(LR0Item::new(unfinished_item.rule_index, unfinished_item.dot + 1)));
+                        result = result.union(&self.skip_epsilon(LR0Item::new(unfinished_item.rule_index, unfinished_item.dot + 1))).cloned().collect();
                     }
                 }
             }
@@ -240,9 +249,9 @@ impl HarrisonParser {
         let mut result = HashSet::new();
         for item in previous.iter() {
             let rule = &self.grammar[item.rule_index];
-            if let Some((token, _)) = &rule.body.get(item.dot) {
-                if word == token {
-                    result.insert(self.skip_epsilon(LR0Item::new(item.rule_index, item.dot + 1)));
+            if let Some((token, term)) = &rule.body.get(item.dot) {
+                if word == token && *term {
+                    result = result.union(&self.skip_epsilon(LR0Item::new(item.rule_index, item.dot + 1))).cloned().collect();
                 }
             }
         }
@@ -261,7 +270,7 @@ impl HarrisonParser {
             // Scan
             for i in 0..j {
                 t[i][j] = self.scan(&t[i][j - 1], words[j - 1]);
-                println!("t[{}, {}] = {:?}", i, j, t[i][j]);
+                debug!("scan: t[{}, {}] = {:?}", i, j, t[i][j]);
             }
 
             // Complete
@@ -274,7 +283,7 @@ impl HarrisonParser {
                     t[i][j] = t[i][j].union(&result).cloned().collect();
                 }
 
-                println!("t[{}, {}] = {:?}", k, j, t[k][j]);
+                debug!("complete: t[{}, {}] = {:?}", k, j, t[k][j]);
             }
 
             // Predict
@@ -289,7 +298,7 @@ impl HarrisonParser {
                 .filter(|(_, term)| !*term)
                 .map(|(sym, _)| sym.clone()).collect());
 
-            println!("t[{}, {}] = {:?}", j, j, t[j][j]);
+            debug!("predict: t[{}, {}] = {:?}", j, j, t[j][j]);
         }
 
         //println!("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
@@ -339,12 +348,22 @@ mod tests {
     }
 
     #[test]
-    fn test_parens_valid() {
-        assert!(harrison_recognize("examples/parens.txt", &vec!["(", "(", ")", ")"]));
+    fn test_dyck1_valid() {
+        assert!(harrison_recognize("examples/dyck1.txt", &vec!["(", "(", ")", ")"]));
     }
 
     #[test]
-    fn test_parens_invalid() {
-        assert!(!harrison_recognize("examples/parens.txt", &vec!["(", "(", "(", "("]));
+    fn test_dyck1_invalid() {
+        assert!(!harrison_recognize("examples/dyck1.txt", &vec!["(", "(", "(", "("]));
+    }
+
+    #[test]
+    fn test_even_zeros_valid() {
+        assert!(harrison_recognize("examples/even_zeros.txt", &vec!["1", "0", "0", "1"]));
+    }
+
+    #[test]
+    fn test_even_zeros_invalid() {
+        assert!(!harrison_recognize("examples/even_zeros.txt", &vec!["1", "1", "0", "1"]));
     }
 }
