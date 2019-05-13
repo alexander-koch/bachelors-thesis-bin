@@ -1,4 +1,4 @@
-ROOT = e .
-e = t | e "+" t .
-t = p | p "*" t .
-p = "a" .
+S' = E .
+E = T | E "+" T .
+T = P | P "*" T .
+P = "a" .

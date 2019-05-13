@@ -1,7 +1,9 @@
-ROOT = S .
+S' = S .
 S = ident ":=" ident "+" const
   | ident ":=" ident "-" const
   | S ";" S
-  | "loop" ident "do" S "end" .
+  | "loop" ident "do" S "end"
+  .
+
 ident = "x" | "y" | "z" .
 const = "0" | "1" .

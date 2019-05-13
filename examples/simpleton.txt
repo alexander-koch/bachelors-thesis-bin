@@ -1,4 +1,4 @@
-ROOT = S .
+S' = S .
 S = A B C D E .
 A = "a" | .
 B = "b" | .

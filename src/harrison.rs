@@ -328,42 +328,26 @@ mod tests {
     }
 
     #[test]
-    fn test_harrison1_valid() {
+    fn test_harrison1() {
         assert!(harrison_recognize("examples/harrison.txt", &vec!["a"]));
-    }
-
-    #[test]
-    fn test_harrison1_invalid() {
         assert!(!harrison_recognize("examples/harrison.txt", &vec!["b"]));
     }
 
     #[test]
     fn test_harrison2() {
         assert!(harrison_recognize("examples/harrison2.txt", &vec!["a", "+", "a", "*", "a"]));
-    }
-
-    #[test]
-    fn test_harrison2_invalid() {
         assert!(!harrison_recognize("examples/harrison2.txt", &vec!["a", "+", "+"]));
     }
 
     #[test]
-    fn test_dyck1_valid() {
+    fn test_dyck1() {
         assert!(harrison_recognize("examples/dyck1.txt", &vec!["(", "(", ")", ")"]));
-    }
-
-    #[test]
-    fn test_dyck1_invalid() {
         assert!(!harrison_recognize("examples/dyck1.txt", &vec!["(", "(", "(", "("]));
     }
 
     #[test]
-    fn test_even_zeros_valid() {
+    fn test_even_zeros() {
         assert!(harrison_recognize("examples/even_zeros.txt", &vec!["1", "0", "0", "1"]));
-    }
-
-    #[test]
-    fn test_even_zeros_invalid() {
         assert!(!harrison_recognize("examples/even_zeros.txt", &vec!["1", "1", "0", "1"]));
     }
 }

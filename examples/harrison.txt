@@ -1,4 +1,4 @@
-R = S .
+S' = S .
 S = A B .
 A = .
 B = C D C .

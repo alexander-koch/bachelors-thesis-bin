@@ -10,7 +10,6 @@ pub enum TokenType {
     Alternative,
     Assign,
     Dot,
-    Epsilon,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -151,7 +150,7 @@ impl<'a> Lexer<'a> {
     fn is_punctuation(&mut self) -> bool {
         self.current
             .map(|c| match c {
-                '|' | '[' | ']' | '=' => true,
+                '|' | '=' => true,
                 _ => false,
             })
             .unwrap_or(false)
@@ -211,21 +210,16 @@ impl<'a> Lexer<'a> {
         while self.is_ident() {
             self.consume()
         }
+        while self.curr_is('\'') {
+            self.consume()
+        }
 
         // Test for builtin-types
         let s = &self.data[start..self.cursor];
-        let kind = match s {
-            "eps" => TokenType::Epsilon,
-            _ => TokenType::Identifier,
-        };
 
         Ok(Token {
-            typ: kind,
-            value: if kind == TokenType::Identifier {
-                Some(s.to_owned())
-            } else {
-                None
-            },
+            typ: TokenType::Identifier,
+            value: Some(s.to_owned()),
             position: position,
         })
     }

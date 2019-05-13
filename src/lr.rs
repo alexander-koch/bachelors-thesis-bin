@@ -24,7 +24,7 @@ impl LR0Item {
 
 pub fn is_final(grammar: &Grammar, item: &LR0Item) -> bool {
     let len = grammar[item.rule_index].body.len();
-    item.dot >= len || len == 0
+    item.dot >= len
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

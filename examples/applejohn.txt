@@ -1,4 +1,5 @@
-ROOT = NP.
-NP = DET N | "John".
-DET = "the".
-N = "apple".
+S' = NP.
+NP = DET N | "John" .
+
+DET = "the" .
+N = "apple" .

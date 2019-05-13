@@ -198,7 +198,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                         body: body.clone(),
                     });
                     body.clear()
-                }
+                },
                 TokenType::Dot => break,
                 _ => return Err(self.err("Expected Ident, Terminal or Dot".to_owned())),
             }
