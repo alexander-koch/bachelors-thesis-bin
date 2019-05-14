@@ -2,6 +2,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::rc::Rc;
 use std::collections::HashSet;
+use clap::{App, Arg};
 
 pub mod ebnf;
 pub mod lexer;
@@ -15,54 +16,119 @@ pub mod earley;
 use lr::LRParser;
 use earley::EarleyParser;
 use harrison::HarrisonParser;
-
-use docopt::Docopt;
-use serde::Deserialize;
+use ebnf::Grammar;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
-const USAGE: &'static str = "
-thesis_bin.
-Implementation of context-free parsing algorithms.
-Copyright (c) Alexander Koch 2019
 
-Usage:
-  thesis_bin earley <grammar>
-  thesis_bin ll1 <grammar>
-  thesis_bin lr1 <grammar>
-  thesis_bin harrison <grammar>
-  thesis_bin firstfollow <grammar>
-  thesis_bin (-h | --help)
-  thesis_bin --version
+#[derive(Debug, Clone)]
+enum ParsingEngine {
+    Earley(Box<EarleyParser>),
+    Harrison(Box<HarrisonParser>),
+    LL1(Box<ll::LLTable>),
+    LR1(Box<lr::LRTable>)
+}
 
-Options:
-  -h --help     Show this screen.
-  --version     Show version.
-";
+#[derive(Debug, Clone)]
+struct ParsingContext {
+    engine: ParsingEngine,
+    output: Option<String>
+}
 
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_grammar: Option<String>,
-    cmd_earley: bool,
-    cmd_ll1: bool,
-    cmd_lr1: bool,
-    cmd_harrison: bool,
-    cmd_firstfollow: bool,
-    flag_version: bool,
+fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
+    let words: Vec<&str> = word.split_whitespace().collect();
+    println!("{:?}", words);
+
+    let result = match &mut ctx.engine {
+        ParsingEngine::Earley(earley_parser) => {
+            let states = earley_parser.as_mut().analyze(&words);
+            println!("{}", earley::fmt_state_set_list(grammar, &states));
+
+            if let Some(ref output) = ctx.output {
+                let mut fb = sppf::ForestBuilder::new();
+                let forest = fb.build_forest(grammar, &states);
+
+                if let Err(x) = sppf::render_sppf(&output, grammar, &forest) {
+                    println!("{}", x);
+                }
+            }
+
+            EarleyParser::accepts(&states, &words)
+        },
+        ParsingEngine::Harrison(harrison_parser) => {
+            harrison_parser.as_mut().accepts(&words)
+        },
+        ParsingEngine::LL1(ll_table) => {
+            ll::parse_ll(grammar, ll_table.as_mut(), &words)
+        },
+        ParsingEngine::LR1(lr_table) => {
+            lr::parse_lr(&grammar, lr_table.as_mut(), &words)
+        }
+    };
+
+    println!("w in L(G): {}", result);
+}
+
+fn run_repl(grammar: &Grammar, ctx: &mut ParsingContext) {
+    let mut rl = Editor::<()>::new();
+    loop {
+        let readline = rl.readline(">> ");
+        match readline {
+            Ok(line) => {
+                rl.add_history_entry(line.as_ref());
+                check_word(grammar, ctx, &line);                
+            }
+            Err(ReadlineError::Interrupted) => break,
+            Err(ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        }
+    }
 }
 
 fn main() {
     env_logger::init();
+    let version_str = format!("v{}", VERSION.unwrap_or("-unknown"));
 
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.deserialize())
-        .unwrap_or_else(|e| e.exit());
+    let matches = App::new("thesis_bin")
+        .version(version_str.as_str())
+        .author("Alexander Koch <kochalexander@gmx.net")
+        .about("Implementation of context-free parsing algorithms.")
+        .arg(Arg::with_name("parser")
+            .short("p")
+            .long("parser")
+            .value_name("parser")
+            .help("Select the parsing engine to use")
+            .takes_value(true))
+        .arg(Arg::with_name("grammar")
+            .short("g")
+            .long("grammar")
+            .value_name("grammar")
+            .help("Grammar file to use")
+            .required(true)
+            .takes_value(true))
+        .arg(Arg::with_name("input")
+            .short("i")
+            .long("input")
+            .value_name("input")
+            .help("Input word")
+            .takes_value(true))
+        .arg(Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .value_name("output")
+            .help("Output file to write Graphviz DOT file")
+            .takes_value(true))
+        .arg(Arg::with_name("firstfollow")
+            .short("ff")
+            .long("firstfollow")
+            .value_name("firstfollow")
+            .help("Compute the FIRST and FOLLOW sets")
+            .takes_value(false))
+        .get_matches();
 
-    if args.flag_version {
-        println!("thesis_bin v{}", VERSION.unwrap_or("-unknown"));
-        std::process::exit(0);
-    }
-
-    let grammar_path = args.arg_grammar.unwrap();
+    let grammar_path = matches.value_of("grammar").unwrap();
     let grammar = match ebnf::parse_grammar(&grammar_path) {
         Ok(x) => Rc::new(x),
         Err(x) => panic!("{:?}", x),
@@ -72,7 +138,7 @@ fn main() {
         println!("{}. {}", i, rule);
     }
 
-    if args.cmd_firstfollow {
+    if matches.is_present("firstfollow") {
         let mut ff = ll::FFSets::new(&grammar);
         let symbols = &grammar
             .iter()
@@ -87,76 +153,35 @@ fn main() {
             let follow = ff.follow(&symbol);
             println!("FOLLOW({}) = {:?}", symbol, follow);
         }
-        std::process::exit(0);
     }
 
-    let mut earley_parser = if args.cmd_earley {
-        Some(EarleyParser::new(&grammar))
-    } else {
-        None
-    };
-
-    let mut harrison_parser = if args.cmd_harrison {
-        Some(HarrisonParser::new(&grammar))
-    } else {
-        None
-    };
-
-    let mut ll_table = if args.cmd_ll1 {
-        let mut ff = ll::FFSets::new(&grammar);
-        let table = ff.construct_ll_table();
-        println!("Table: {:?}", table);
-        Some(table)
-    } else {
-        None
-    };
-
-    let mut lr_table = if args.cmd_lr1 {
-        let mut ff = ll::FFSets::new(&grammar);
-        let table = ff.compute_states();
-        println!("Table: {:?}", table);
-        Some(table)
-    } else {
-        None
-    };
-
-    let mut rl = Editor::<()>::new();
-    loop {
-        let readline = rl.readline(">> ");
-        match readline {
-            Ok(line) => {
-                rl.add_history_entry(line.as_ref());
-                let words: Vec<&str> = line.split_whitespace().collect();
-
-                println!("{:?}", words);
-
-                let result = if args.cmd_earley {
-                    let states = earley_parser.as_mut().unwrap().analyze(&words);
-                    println!("{}", earley::fmt_state_set_list(&grammar, &states));
-
-                    let mut fb = sppf::ForestBuilder::new();
-                    let forest = fb.build_forest(&grammar, &states);
-                    if let Err(x) = sppf::render_sppf("graph.dot", &grammar, &forest) {
-                        println!("{}", x);
-                    }
-
-                    EarleyParser::accepts(&states, &words)
-                } else if args.cmd_ll1 {
-                    ll::parse_ll(&grammar, ll_table.as_mut().unwrap(), &words)
-                } else if args.cmd_lr1 {
-                    lr::parse_lr(&grammar, lr_table.as_mut().unwrap(), &words)
-                } else {
-                    harrison_parser.as_mut().unwrap().accepts(&words)
-                };
-
-                println!("w in L(G): {}", result);
-            }
-            Err(ReadlineError::Interrupted) => break,
-            Err(ReadlineError::Eof) => break,
-            Err(err) => {
-                println!("Error: {:?}", err);
-                break;
-            }
+    let parser = matches.value_of("parser").unwrap_or("earley");
+    let engine = match parser {
+        "earley" => ParsingEngine::Earley(Box::new(EarleyParser::new(&grammar))),
+        "harrison" => ParsingEngine::Harrison(Box::new(HarrisonParser::new(&grammar))),
+        "ll1" => {
+            let mut ff = ll::FFSets::new(&grammar);
+            let table = ff.construct_ll_table();
+            println!("Table: {:?}", table);
+            ParsingEngine::LL1(Box::new(table))
+        },
+        "lr1" => {
+            let mut ff = ll::FFSets::new(&grammar);
+            let table = ff.compute_states();
+            println!("Table: {:?}", table);
+            ParsingEngine::LR1(Box::new(table))
         }
+        _ => panic!("Unknown parsing engine")
+    };
+
+    let mut ctx = ParsingContext {
+        engine: engine,
+        output: matches.value_of("output").map(String::from)
+    };
+
+    if let Some(input) = matches.value_of("input") {
+        check_word(&grammar, &mut ctx, input);
+    } else {
+        run_repl(&grammar, &mut ctx);
     }
 }

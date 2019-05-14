@@ -26,7 +26,7 @@ pub fn is_final_state(grammar: &Grammar, state: &State) -> bool {
 
 pub type StateSetList = Vec<HashSet<State>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EarleyParser {
     grammar: Rc<Grammar>,
     states: StateSetList,
@@ -172,7 +172,7 @@ impl EarleyParser {
     }
 }
 
-pub fn fmt_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
+pub fn fmt_state_set(grammar: &Grammar, states: &HashSet<State>) -> String {
     format!(
         "{{ {} }}",
         states
@@ -183,7 +183,7 @@ pub fn fmt_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
     )
 }
 
-pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
+pub fn fmt_state_set_list(grammar: &Grammar, states: &StateSetList) -> String {
     states
         .iter()
         .enumerate()
@@ -192,7 +192,7 @@ pub fn fmt_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> Strin
         .join("\n")
 }
 
-pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> String {
+pub fn fmt_tex_state_set(grammar: &Grammar, states: &HashSet<State>) -> String {
     format!(
         "$ {} $",
         states
@@ -203,7 +203,7 @@ pub fn fmt_tex_state_set(grammar: &Rc<Grammar>, states: &HashSet<State>) -> Stri
     )
 }
 
-pub fn fmt_tex_state_set_list(grammar: &Rc<Grammar>, states: &StateSetList) -> String {
+pub fn fmt_tex_state_set_list(grammar: &Grammar, states: &StateSetList) -> String {
     states
         .iter()
         .map(|set| format!("\\makecell[l]{{ {} }}", fmt_tex_state_set(grammar, set)))

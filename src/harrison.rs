@@ -143,12 +143,8 @@ impl HarrisonParser {
 
         for i in item.dot..max {
             if let Some((sym, term)) = self.grammar[item.rule_index].body.get(i) {
-                if !term {
-                    if self.ff.first(sym).contains("") {
-                        result.insert(LR0Item::new(item.rule_index, i+1));     
-                    } else {
-                        break
-                    }
+                if !term && self.ff.first(sym).contains("") {
+                    result.insert(LR0Item::new(item.rule_index, i+1));
                 } else {
                     break
                 }
