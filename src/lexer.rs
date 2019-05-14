@@ -5,8 +5,8 @@ use std::fmt;
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TokenType {
     Eof,
-    Identifier,
-    Terminal,
+    Variable,
+    Literal,
     Alternative,
     Assign,
     Dot,
@@ -177,7 +177,7 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    fn scan_terminal(&mut self) -> LexicalResult<Token> {
+    fn scan_literal(&mut self) -> LexicalResult<Token> {
         let position = self.position;
         self.consume();
 
@@ -192,19 +192,19 @@ impl<'a> Lexer<'a> {
         }
 
         if self.current.is_none() {
-            return Err(self.err("Reached end of file, terminal is not ending", self.position));
+            return Err(self.err("Reached end of file, literal is not ending", self.position));
         }
 
         let s = (&self.data[start..self.cursor]).to_string();
         self.consume();
         Ok(Token {
-            typ: TokenType::Terminal,
+            typ: TokenType::Literal,
             value: Some(s),
             position: position,
         })
     }
 
-    fn scan_identifier(&mut self) -> LexicalResult<Token> {
+    fn scan_variable(&mut self) -> LexicalResult<Token> {
         let start = self.cursor;
         let position = self.position;
         while self.is_ident() {
@@ -218,7 +218,7 @@ impl<'a> Lexer<'a> {
         let s = &self.data[start..self.cursor];
 
         Ok(Token {
-            typ: TokenType::Identifier,
+            typ: TokenType::Variable,
             value: Some(s.to_owned()),
             position: position,
         })
@@ -237,11 +237,11 @@ impl<'a> Lexer<'a> {
             self.skip_space();
             self.next_token()
         } else if self.curr_is('"') {
-            self.scan_terminal()
+            self.scan_literal()
         } else if self.is_punctuation() {
             self.scan_punctuation()
         } else if self.is_ident() {
-            self.scan_identifier()
+            self.scan_variable()
         } else {
             Err(self.err("Invalid character", position))
         }

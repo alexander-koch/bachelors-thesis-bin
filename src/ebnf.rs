@@ -161,11 +161,8 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
 
     /// If the current token contains a string value it is returned.
     /// Otherwise an empty string is returned.
-    fn get_current_value(&mut self) -> String {
-        String::from(match self.current.value {
-            Some(ref v) => &**v,
-            None => "",
-        })
+    fn get_current_value(&self) -> Result<String, Error> {
+        self.current.value.as_ref().map(|x| x.to_owned()).ok_or(self.err("Trying to unwrap a reserved token".to_owned()))
     }
 
     fn expect_type(&mut self, t: TokenType) -> ParsingResult<()> {
@@ -180,18 +177,21 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
         }
     }
 
-    // a = "a" a | "a" .
+    /// Production     = Variable "=" Expression "." .
+    /// Expression     = Group | Group "|" Expression .
+    /// Group          = Term | Term Group | .
+    /// Term           = Variable | Literal .
     fn parse_rule(&mut self) -> ParsingResult<Vec<Rule>> {
-        let name = self.get_current_value();
-        self.expect_type(TokenType::Identifier)?;
+        let name = self.get_current_value()?;
+        self.expect_type(TokenType::Variable)?;
         self.expect_type(TokenType::Assign)?;
 
         let mut rules = Vec::new();
         let mut body = Vec::new();
         loop {
             match self.current.typ {
-                TokenType::Identifier => body.push((self.get_current_value(), false)),
-                TokenType::Terminal => body.push((self.get_current_value(), true)),
+                TokenType::Variable => body.push((self.get_current_value()?, false)),
+                TokenType::Literal => body.push((self.get_current_value()?, true)),
                 TokenType::Alternative => {
                     rules.push(Rule {
                         head: name.clone(),
@@ -200,7 +200,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                     body.clear()
                 },
                 TokenType::Dot => break,
-                _ => return Err(self.err("Expected Ident, Terminal or Dot".to_owned())),
+                _ => return Err(self.err("Invalid token".to_owned())),
             }
 
             self.bump()
@@ -226,7 +226,6 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     }
 
     pub fn parse(&mut self) -> ParsingResult<Grammar> {
-        //debug!("Parsing");
         let rules = self.parse_rules()?;
         self.expect_type(TokenType::Eof)?;
         Ok(Grammar::new(rules))
