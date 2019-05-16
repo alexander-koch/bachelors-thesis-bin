@@ -197,7 +197,11 @@ pub fn fmt_tex_state_set(grammar: &Grammar, states: &HashSet<State>) -> String {
         "$ {} $",
         states
             .iter()
-            .map(|x| format!("({}, {})", grammar[x.rule_index].fmt_tex_dot(x.dot), x.start))
+            .map(|x| format!(
+                "({}, {})",
+                grammar[x.rule_index].fmt_tex_dot(x.dot),
+                x.start
+            ))
             .collect::<Vec<String>>()
             .join(" $ \\\\ $ ")
     )
@@ -233,19 +237,37 @@ mod tests {
 
     #[test]
     fn test_harrison2() {
-        assert!(earley_recognize("examples/harrison2.txt", &vec!["a", "+", "a", "*", "a"]));
-        assert!(!earley_recognize("examples/harrison2.txt", &vec!["a", "+", "+"]));
+        assert!(earley_recognize(
+            "examples/harrison2.txt",
+            &vec!["a", "+", "a", "*", "a"]
+        ));
+        assert!(!earley_recognize(
+            "examples/harrison2.txt",
+            &vec!["a", "+", "+"]
+        ));
     }
 
     #[test]
     fn test_dyck1() {
-        assert!(earley_recognize("examples/dyck1.txt", &vec!["(", "(", ")", ")"]));
-        assert!(!earley_recognize("examples/dyck1.txt", &vec!["(", "(", "(", "("]));
+        assert!(earley_recognize(
+            "examples/dyck1.txt",
+            &vec!["(", "(", ")", ")"]
+        ));
+        assert!(!earley_recognize(
+            "examples/dyck1.txt",
+            &vec!["(", "(", "(", "("]
+        ));
     }
 
     #[test]
     fn test_even_zeros() {
-        assert!(earley_recognize("examples/even_zeros.txt", &vec!["1", "0", "0", "1"]));
-        assert!(!earley_recognize("examples/even_zeros.txt", &vec!["1", "1", "0", "1"]));
+        assert!(earley_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "0", "0", "1"]
+        ));
+        assert!(!earley_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "0", "1"]
+        ));
     }
 }

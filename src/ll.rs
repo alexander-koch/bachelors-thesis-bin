@@ -149,9 +149,19 @@ impl FFSets {
             }
 
             for symbol in set.iter() {
-                match table.entry(rule.head.clone()).or_insert_with(HashMap::new).entry(symbol.clone()) {
-                    Entry::Occupied(o) => panic!("LL conflict, {}[\"{}\"] = {}/{}", rule.head, symbol, o.get(), i),
-                    Entry::Vacant(v) => v.insert(i)
+                match table
+                    .entry(rule.head.clone())
+                    .or_insert_with(HashMap::new)
+                    .entry(symbol.clone())
+                {
+                    Entry::Occupied(o) => panic!(
+                        "LL conflict, {}[\"{}\"] = {}/{}",
+                        rule.head,
+                        symbol,
+                        o.get(),
+                        i
+                    ),
+                    Entry::Vacant(v) => v.insert(i),
                 };
             }
         }
@@ -173,15 +183,15 @@ pub fn parse_ll(
     loop {
         //println!("Current word: {}, stack: {:?}", words[i], stack);
         if i >= words.len() {
-            return false
+            return false;
         }
 
         if let Some((symbol, term)) = stack.last() {
             if *term {
                 if &words[i] != symbol {
-                    return false
+                    return false;
                 } else if words[i] == "$" && *symbol == "$" {
-                    return true
+                    return true;
                 } else {
                     stack.pop();
                     i += 1;
@@ -194,11 +204,11 @@ pub fn parse_ll(
                         stack.push((&symbol, *term));
                     }
                 } else {
-                    return false
+                    return false;
                 }
             }
         } else {
-            return false
+            return false;
         }
     }
 }

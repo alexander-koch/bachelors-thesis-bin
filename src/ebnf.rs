@@ -44,11 +44,21 @@ impl Rule {
             .body
             .iter()
             .enumerate()
-            .map(|(i, x)| if i == dot { format!("\\bigdot {}", x.0) } else { x.0.clone() })
+            .map(|(i, x)| {
+                if i == dot {
+                    format!("\\bigdot {}", x.0)
+                } else {
+                    x.0.clone()
+                }
+            })
             .collect::<Vec<String>>()
             .join(" ");
 
-        let last = if dot >= self.body.len() { " \\bigdot" } else { "" };
+        let last = if dot >= self.body.len() {
+            " \\bigdot"
+        } else {
+            ""
+        };
 
         format!("{} \\rightarrow {}{}", self.head, rhs, last)
     }
@@ -162,7 +172,11 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     /// If the current token contains a string value it is returned.
     /// Otherwise an empty string is returned.
     fn get_current_value(&self) -> Result<String, Error> {
-        self.current.value.as_ref().map(|x| x.to_owned()).ok_or(self.err("Trying to unwrap a reserved token".to_owned()))
+        self.current
+            .value
+            .as_ref()
+            .map(|x| x.to_owned())
+            .ok_or(self.err("Trying to unwrap a reserved token".to_owned()))
     }
 
     fn expect_type(&mut self, t: TokenType) -> ParsingResult<()> {
@@ -198,7 +212,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                         body: body.clone(),
                     });
                     body.clear()
-                },
+                }
                 TokenType::Dot => break,
                 _ => return Err(self.err("Invalid token".to_owned())),
             }

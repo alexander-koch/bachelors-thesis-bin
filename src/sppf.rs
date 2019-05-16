@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet, BTreeSet};
-use std::cmp::Ordering;
-use std::rc::Rc;
+use crate::earley::{is_final_state, State, StateSetList};
+use crate::ebnf::{Grammar, Rule};
 use crate::lr::LR0Item;
-use crate::ebnf::{Rule, Grammar};
-use crate::earley::{State, StateSetList, is_final_state};
+use std::cmp::Ordering;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::rc::Rc;
 
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SPPFKind {
@@ -15,7 +15,7 @@ pub enum SPPFKind {
     /// (x, j, i) - x symbol, j left extent, i right extent
     Symbol(String, usize, usize),
 
-    /// (B ::= a * B b, i, j), 
+    /// (B ::= a * B b, i, j),
     Intermediate(LR0Item, usize, usize),
 }
 
@@ -23,12 +23,13 @@ impl SPPFKind {
     fn fmt(&self, grammar: &Grammar) -> String {
         match self {
             SPPFKind::Epsilon => "eps".to_owned(),
-            SPPFKind::Symbol(a, i, j) => {
-                format!("{}, {}, {}", a, i, j)
-            },
-            SPPFKind::Intermediate(item, i, j) => {
-                format!("{}, {}, {}", grammar[item.rule_index].fmt_dot(item.dot), i, j)
-            }
+            SPPFKind::Symbol(a, i, j) => format!("{}, {}, {}", a, i, j),
+            SPPFKind::Intermediate(item, i, j) => format!(
+                "{}, {}, {}",
+                grammar[item.rule_index].fmt_dot(item.dot),
+                i,
+                j
+            ),
         }
     }
 }
@@ -36,7 +37,7 @@ impl SPPFKind {
 #[derive(Debug, Clone, Hash)]
 pub enum FamilyNode {
     Node(usize),
-    Group(usize, usize)
+    Group(usize, usize),
 }
 
 impl Ord for FamilyNode {
@@ -45,7 +46,7 @@ impl Ord for FamilyNode {
         match self {
             FamilyNode::Node(s) => match other {
                 FamilyNode::Node(x) => s.cmp(x),
-                FamilyNode::Group(x, _) => s.cmp(x) 
+                FamilyNode::Group(x, _) => s.cmp(x),
             },
             FamilyNode::Group(w, v) => match other {
                 FamilyNode::Node(s) => w.cmp(s),
@@ -56,7 +57,7 @@ impl Ord for FamilyNode {
                         w.cmp(x).then(v.cmp(y))
                     }
                 }
-            }
+            },
         }
     }
 }
@@ -70,20 +71,14 @@ impl PartialOrd for FamilyNode {
 impl PartialEq for FamilyNode {
     fn eq(&self, other: &FamilyNode) -> bool {
         match self {
-            FamilyNode::Node(s) => {
-                match other {
-                    FamilyNode::Node(d) => s == d,
-                    FamilyNode::Group(_, _) => false
-                }
+            FamilyNode::Node(s) => match other {
+                FamilyNode::Node(d) => s == d,
+                FamilyNode::Group(_, _) => false,
             },
-            FamilyNode::Group(w, v) => {
-                match other {
-                    FamilyNode::Node(_) => false,
-                    FamilyNode::Group(x, y) => {
-                        x == w && y == v || y == w && x == v
-                    } 
-                }
-            }
+            FamilyNode::Group(w, v) => match other {
+                FamilyNode::Node(_) => false,
+                FamilyNode::Group(x, y) => x == w && y == v || y == w && x == v,
+            },
         }
     }
 }
@@ -92,14 +87,14 @@ impl Eq for FamilyNode {}
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SPPFNode {
     pub kind: SPPFKind,
-    pub family: BTreeSet<FamilyNode>
+    pub family: BTreeSet<FamilyNode>,
 }
 
 impl SPPFNode {
     pub fn eps() -> SPPFNode {
         SPPFNode {
             kind: SPPFKind::Epsilon,
-            family: BTreeSet::new()
+            family: BTreeSet::new(),
         }
     }
 
@@ -107,7 +102,7 @@ impl SPPFNode {
         // if (x, y) is in the set then (y, x) is already
         // Groups should be symmetric
         if self.family.contains(&node) {
-            return
+            return;
         }
 
         if self.family.len() == 2 {
@@ -116,7 +111,7 @@ impl SPPFNode {
             for (i, n) in self.family.iter().enumerate() {
                 match n {
                     FamilyNode::Node(s) => idx[i] = *s,
-                    FamilyNode::Group(_, _) => panic!("Group error")
+                    FamilyNode::Group(_, _) => panic!("Group error"),
                 }
             }
 
@@ -144,7 +139,7 @@ pub struct ForestBuilder {
     visited: HashSet<(State, usize)>,
     predecessors: Rc<HashMap<(State, usize), Vec<(State, usize)>>>,
     reductions: Rc<HashMap<(State, usize), Vec<(State, usize)>>>,
-    
+
     known: HashMap<SPPFKind, usize>,
     nodes: Vec<SPPFNode>,
 }
@@ -156,7 +151,7 @@ impl ForestBuilder {
             predecessors: Rc::new(HashMap::new()),
             reductions: Rc::new(HashMap::new()),
             known: HashMap::new(),
-            nodes: Vec::new()
+            nodes: Vec::new(),
         }
     }
 
@@ -167,19 +162,25 @@ impl ForestBuilder {
             let idx = self.nodes.len();
             let node = SPPFNode {
                 kind: kind.clone(),
-                family: BTreeSet::new()
+                family: BTreeSet::new(),
             };
             self.nodes.push(node.clone());
-           // println!("Creating node: u{} = {:?}", idx, node);
+            // println!("Creating node: u{} = {:?}", idx, node);
             //let idx = self.nodes.len()-1;
             self.known.insert(kind, idx);
             idx
         }
     }
 
-    fn build_tree(&mut self, grammar: &Grammar, start_node: usize, set_index: usize, state: &State) {
+    fn build_tree(
+        &mut self,
+        grammar: &Grammar,
+        start_node: usize,
+        set_index: usize,
+        state: &State,
+    ) {
         if let Some(_) = self.visited.get(&(state.clone(), set_index)) {
-            return
+            return;
         } else {
             self.visited.insert((state.clone(), set_index));
         }
@@ -198,14 +199,18 @@ impl ForestBuilder {
                 // Last symbol
                 if *term {
                     //println!("Rule 1");
-                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index-1, set_index));
+                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index - 1, set_index));
                     self.nodes[start_node].add_family_node(FamilyNode::Node(v));
                 } else {
                     //println!("Rule 2");
                     let v = self.make_node(SPPFKind::Symbol(sym.clone(), state.start, set_index));
 
                     if let Some(vec) = self.reductions.clone().get(&(state.clone(), set_index)) {
-                        for q in vec.iter().filter(|(_, j)| *j == state.start).map(|(x, _)| x) {
+                        for q in vec
+                            .iter()
+                            .filter(|(_, j)| *j == state.start)
+                            .map(|(x, _)| x)
+                        {
                             self.build_tree(grammar, v, set_index, q);
                         }
                     }
@@ -214,11 +219,16 @@ impl ForestBuilder {
             } else {
                 if *term {
                     //println!("Rule 3");
-                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index-1, set_index));
-                    let w = self.make_node(SPPFKind::Intermediate(LR0Item::new(state.rule_index, state.dot-1), state.start, set_index-1));
+                    let v = self.make_node(SPPFKind::Symbol(sym.clone(), set_index - 1, set_index));
+                    let w = self.make_node(SPPFKind::Intermediate(
+                        LR0Item::new(state.rule_index, state.dot - 1),
+                        state.start,
+                        set_index - 1,
+                    ));
 
                     if let Some(vec) = self.predecessors.clone().get(&(state.clone(), set_index)) {
-                        for (q, i) in vec.iter().filter(|(_, j)| *j == set_index-1) {//.map(|(x, _)| x) {
+                        for (q, i) in vec.iter().filter(|(_, j)| *j == set_index - 1) {
+                            //.map(|(x, _)| x) {
                             self.build_tree(grammar, w, *i, q);
                         }
                     }
@@ -232,9 +242,16 @@ impl ForestBuilder {
                             let v = self.make_node(SPPFKind::Symbol(sym.clone(), *l, set_index));
                             self.build_tree(grammar, v, set_index, q);
 
-                            let w = self.make_node(SPPFKind::Intermediate(LR0Item::new(state.rule_index, state.dot-1), state.start, *l));
-                            if let Some(vec) = self.predecessors.clone().get(&(state.clone(), set_index)) {
-                                for (p, i) in vec.iter().filter(|(_, j)| *j == *l) {//.map(|(x, _)| x) {
+                            let w = self.make_node(SPPFKind::Intermediate(
+                                LR0Item::new(state.rule_index, state.dot - 1),
+                                state.start,
+                                *l,
+                            ));
+                            if let Some(vec) =
+                                self.predecessors.clone().get(&(state.clone(), set_index))
+                            {
+                                for (p, i) in vec.iter().filter(|(_, j)| *j == *l) {
+                                    //.map(|(x, _)| x) {
                                     self.build_tree(grammar, w, *i, p);
                                 }
                             }
@@ -266,18 +283,23 @@ impl ForestBuilder {
 
         for i in 0..states.len() {
             for t in states[i].iter() {
-
                 if is_final_state(grammar, t) {
                     let t_rule = &grammar[t.rule_index];
                     for q in states[t.start].iter() {
                         if let Some((token, term)) = grammar[q.rule_index].body.get(q.dot) {
                             if !is_final_state(&grammar, q) && !term && *token == t_rule.head {
                                 let p = State::new(q.rule_index, q.dot + 1, q.start);
-                                
-                                reductions.entry((p.clone(), i)).or_insert_with(Vec::new).push((t.clone(), t.start));
+
+                                reductions
+                                    .entry((p.clone(), i))
+                                    .or_insert_with(Vec::new)
+                                    .push((t.clone(), t.start));
                                 // Tau != eps
                                 if q.dot > 0 {
-                                    predecessors.entry((p, i)).or_insert_with(Vec::new).push((q.clone(), t.start));
+                                    predecessors
+                                        .entry((p, i))
+                                        .or_insert_with(Vec::new)
+                                        .push((q.clone(), t.start));
                                 }
                             }
                         }
@@ -286,12 +308,20 @@ impl ForestBuilder {
 
                 // Scan
                 if t.dot > 1 {
-                    for prev in states[i-1].iter()
-                        .filter(|x| x.start == t.start 
+                    for prev in states[i - 1].iter().filter(|x| {
+                        x.start == t.start
                             && x.rule_index == t.rule_index
-                            && x.dot == t.dot-1
-                            && grammar[x.rule_index].body.get(x.dot).map(|x| x.1).unwrap_or(false)) {
-                        predecessors.entry((t.clone(), i)).or_insert_with(Vec::new).push((prev.clone(), i-1));
+                            && x.dot == t.dot - 1
+                            && grammar[x.rule_index]
+                                .body
+                                .get(x.dot)
+                                .map(|x| x.1)
+                                .unwrap_or(false)
+                    }) {
+                        predecessors
+                            .entry((t.clone(), i))
+                            .or_insert_with(Vec::new)
+                            .push((prev.clone(), i - 1));
                     }
                 }
             }
@@ -315,10 +345,11 @@ impl ForestBuilder {
         }*/
 
         let start_rule: &Rule = &grammar[0];
-        for state in states[n]
-            .iter()
-            .filter(|x| is_final_state(grammar, x) && grammar[x.rule_index].head == start_rule.head && x.start == 0)
-        {
+        for state in states[n].iter().filter(|x| {
+            is_final_state(grammar, x)
+                && grammar[x.rule_index].head == start_rule.head
+                && x.start == 0
+        }) {
             self.build_tree(grammar, start_node, n, state);
         }
 
@@ -336,10 +367,16 @@ pub fn render_sppf(path: &str, grammar: &Grammar, nodes: &Vec<SPPFNode>) -> std:
     for (i, node) in nodes.iter().enumerate() {
         let style = match node.kind {
             SPPFKind::Intermediate(_, _, _) => "shape=box",
-            _ => "shape=box, style=rounded"
+            _ => "shape=box, style=rounded",
         };
 
-        writeln!(f, "\t{} [label=\"{}\", {}];", i, node.kind.fmt(grammar), style)?;
+        writeln!(
+            f,
+            "\t{} [label=\"{}\", {}];",
+            i,
+            node.kind.fmt(grammar),
+            style
+        )?;
     }
 
     let mut j = nodes.len();
@@ -348,7 +385,11 @@ pub fn render_sppf(path: &str, grammar: &Grammar, nodes: &Vec<SPPFNode>) -> std:
             match child {
                 FamilyNode::Node(s) => writeln!(f, "\t{} -> {};", i, s)?,
                 FamilyNode::Group(w, v) => {
-                    writeln!(f, "\t{} [shape=circle, fixedsize=true, width=0.15, height=0.15, label=\"\"]", j)?;
+                    writeln!(
+                        f,
+                        "\t{} [shape=circle, fixedsize=true, width=0.15, height=0.15, label=\"\"]",
+                        j
+                    )?;
                     writeln!(f, "\t{} -> {};", i, j)?;
                     writeln!(f, "\t{} -> {};", j, w)?;
                     writeln!(f, "\t{} -> {};", j, v)?;

@@ -1,22 +1,22 @@
+use clap::{App, Arg};
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
-use std::rc::Rc;
 use std::collections::HashSet;
-use clap::{App, Arg};
+use std::rc::Rc;
 
 pub mod ebnf;
 pub mod lexer;
 
+pub mod earley;
 pub mod harrison;
 pub mod ll;
 pub mod lr;
 pub mod sppf;
-pub mod earley;
 
-use lr::LRParser;
 use earley::EarleyParser;
-use harrison::HarrisonParser;
 use ebnf::Grammar;
+use harrison::HarrisonParser;
+use lr::LRParser;
 
 const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 
@@ -25,13 +25,13 @@ enum ParsingEngine {
     Earley(Box<EarleyParser>),
     Harrison(Box<HarrisonParser>),
     LL1(Box<ll::LLTable>),
-    LR1(Box<lr::LRTable>)
+    LR1(Box<lr::LRTable>),
 }
 
 #[derive(Debug, Clone)]
 struct ParsingContext {
     engine: ParsingEngine,
-    output: Option<String>
+    output: Option<String>,
 }
 
 fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
@@ -53,16 +53,10 @@ fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
             }
 
             EarleyParser::accepts(&states, &words)
-        },
-        ParsingEngine::Harrison(harrison_parser) => {
-            harrison_parser.as_mut().accepts(&words)
-        },
-        ParsingEngine::LL1(ll_table) => {
-            ll::parse_ll(grammar, ll_table.as_mut(), &words)
-        },
-        ParsingEngine::LR1(lr_table) => {
-            lr::parse_lr(&grammar, lr_table.as_mut(), &words)
         }
+        ParsingEngine::Harrison(harrison_parser) => harrison_parser.as_mut().accepts(&words),
+        ParsingEngine::LL1(ll_table) => ll::parse_ll(grammar, ll_table.as_mut(), &words),
+        ParsingEngine::LR1(lr_table) => lr::parse_lr(&grammar, lr_table.as_mut(), &words),
     };
 
     println!("w in L(G): {}", result);
@@ -75,7 +69,7 @@ fn run_repl(grammar: &Grammar, ctx: &mut ParsingContext) {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_ref());
-                check_word(grammar, ctx, &line);                
+                check_word(grammar, ctx, &line);
             }
             Err(ReadlineError::Interrupted) => break,
             Err(ReadlineError::Eof) => break,
@@ -95,37 +89,47 @@ fn main() {
         .version(version_str.as_str())
         .author("Alexander Koch <kochalexander@gmx.net")
         .about("Implementation of context-free parsing algorithms.")
-        .arg(Arg::with_name("parser")
-            .short("p")
-            .long("parser")
-            .value_name("parser")
-            .help("Select the parsing engine to use")
-            .takes_value(true))
-        .arg(Arg::with_name("grammar")
-            .short("g")
-            .long("grammar")
-            .value_name("grammar")
-            .help("Grammar file to use")
-            .required(true)
-            .takes_value(true))
-        .arg(Arg::with_name("input")
-            .short("i")
-            .long("input")
-            .value_name("input")
-            .help("Input word")
-            .takes_value(true))
-        .arg(Arg::with_name("output")
-            .short("o")
-            .long("output")
-            .value_name("output")
-            .help("Output file to write Graphviz DOT file")
-            .takes_value(true))
-        .arg(Arg::with_name("firstfollow")
-            .short("ff")
-            .long("firstfollow")
-            .value_name("firstfollow")
-            .help("Compute the FIRST and FOLLOW sets")
-            .takes_value(false))
+        .arg(
+            Arg::with_name("parser")
+                .short("p")
+                .long("parser")
+                .value_name("parser")
+                .help("Select the parsing engine to use")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("grammar")
+                .short("g")
+                .long("grammar")
+                .value_name("grammar")
+                .help("Grammar file to use")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("input")
+                .short("i")
+                .long("input")
+                .value_name("input")
+                .help("Input word")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .value_name("output")
+                .help("Output file to write Graphviz DOT file")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("firstfollow")
+                .short("ff")
+                .long("firstfollow")
+                .value_name("firstfollow")
+                .help("Compute the FIRST and FOLLOW sets")
+                .takes_value(false),
+        )
         .get_matches();
 
     let grammar_path = matches.value_of("grammar").unwrap();
@@ -164,19 +168,19 @@ fn main() {
             let table = ff.construct_ll_table();
             println!("Table: {:?}", table);
             ParsingEngine::LL1(Box::new(table))
-        },
+        }
         "lr1" => {
             let mut ff = ll::FFSets::new(&grammar);
             let table = ff.compute_states();
             println!("Table: {:?}", table);
             ParsingEngine::LR1(Box::new(table))
         }
-        _ => panic!("Unknown parsing engine")
+        _ => panic!("Unknown parsing engine"),
     };
 
     let mut ctx = ParsingContext {
         engine: engine,
-        output: matches.value_of("output").map(String::from)
+        output: matches.value_of("output").map(String::from),
     };
 
     if let Some(input) = matches.value_of("input") {

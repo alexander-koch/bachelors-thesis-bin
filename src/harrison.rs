@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::ll::FFSets;
 use crate::ebnf::{Grammar, Rule};
+use crate::ll::FFSets;
 use crate::lr::{is_final, LR0Item};
 
 use log::debug;
@@ -19,14 +19,15 @@ pub fn fmt_tex_lr0_set(grammar: &Grammar, states: &HashSet<LR0Item>) -> String {
 }
 
 pub fn fmt_tex_lr0_matrix(grammar: &Grammar, t: Vec<Vec<HashSet<LR0Item>>>) -> String {
-    t
-        .iter()
+    t.iter()
         //.enumerate()
-        .map(|column| column.iter()
-            .map(|x| format!("\\makecell[l]{{ {} }}", fmt_tex_lr0_set(grammar, x)))
-            .collect::<Vec<String>>()
-            .join("\n&")
-        )
+        .map(|column| {
+            column
+                .iter()
+                .map(|x| format!("\\makecell[l]{{ {} }}", fmt_tex_lr0_set(grammar, x)))
+                .collect::<Vec<String>>()
+                .join("\n&")
+        })
         .collect::<Vec<String>>()
         .join("\\\\ \\hline \n")
 }
@@ -39,13 +40,13 @@ pub fn find_rule_reductions(ff: &mut FFSets, rule: &Rule) -> HashSet<String> {
     while let Some((sym, term)) = body.next() {
         //debug!("({}, {})", sym, term);
         if *term {
-            return HashSet::new()
+            return HashSet::new();
         } else {
             if ff.first(sym).contains("") {
                 series.insert(sym.clone());
             } else {
                 terminal = Some(sym);
-                break
+                break;
             }
         }
     }
@@ -75,7 +76,10 @@ pub fn calculate_reductions(ff: &mut FFSets) -> ReductionMap {
     let gr = ff.grammar.clone();
     for rule in gr.iter() {
         for n in find_rule_reductions(ff, rule) {
-            mapping.entry(n).or_insert_with(HashSet::new).insert(rule.head.clone());
+            mapping
+                .entry(n)
+                .or_insert_with(HashSet::new)
+                .insert(rule.head.clone());
         }
     }
 
@@ -86,7 +90,7 @@ pub fn calculate_reductions(ff: &mut FFSets) -> ReductionMap {
 pub struct HarrisonParser {
     grammar: Rc<Grammar>,
     ff: FFSets,
-    reduction_map: ReductionMap
+    reduction_map: ReductionMap,
 }
 
 impl HarrisonParser {
@@ -96,14 +100,14 @@ impl HarrisonParser {
         HarrisonParser {
             grammar: grammar.clone(),
             ff: ff,
-            reduction_map: reduction_map
+            reduction_map: reduction_map,
         }
     }
 
     /// Finds reductions for a given production name
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `symbol` - Name of the production
     fn find_reductions(&self, symbol: String) -> HashSet<String> {
         let mut current = HashSet::new();
@@ -120,7 +124,7 @@ impl HarrisonParser {
             }
 
             if updates.is_empty() {
-                break
+                break;
             }
 
             result = result.union(&updates).cloned().collect();
@@ -132,10 +136,10 @@ impl HarrisonParser {
 
     /// Returns all advancements for a given LR(0)-item
     /// if the following symbol is derivable to epsilon
-    /// 
+    ///
     /// # Arguments
-    /// 
-    /// * `item` - The item to be skipped over 
+    ///
+    /// * `item` - The item to be skipped over
     fn skip_epsilon(&mut self, item: LR0Item) -> HashSet<LR0Item> {
         let max = self.grammar[item.rule_index].body.len();
         let mut result = HashSet::new();
@@ -144,31 +148,32 @@ impl HarrisonParser {
         for i in item.dot..max {
             if let Some((sym, term)) = self.grammar[item.rule_index].body.get(i) {
                 if !term && self.ff.first(sym).contains("") {
-                    result.insert(LR0Item::new(item.rule_index, i+1));
+                    result.insert(LR0Item::new(item.rule_index, i + 1));
                 } else {
-                    break
+                    break;
                 }
             } else {
-                break
+                break;
             }
         }
         result
     }
 
     /// Completes items in Q by using the finished ones in R
-    /// 
+    ///
     /// non-chained:
     /// Q x R = {A -> alpha B beta • | A -> alpha • B beta, B -> lambda • in R}
-    /// 
+    ///
     /// chained:
     /// Q * R = {A -> alpha B beta • | A -> alpha • B beta, B derivable to C, C -> lambda • in R}
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `q` - Set of items to be processed
     /// * `r` - Set of finished items
     /// * `chained` - Allow indirect completion
-    fn complete(&mut self,
+    fn complete(
+        &mut self,
         q: &HashSet<LR0Item>,
         r: &HashSet<LR0Item>,
         chained: bool,
@@ -181,13 +186,17 @@ impl HarrisonParser {
         // Map to the production names
         let terminated_items = r.iter().filter(|x| is_final(&gr, x));
         let terminated_symbols: HashSet<String> = if chained {
-            terminated_items.flat_map(|x| {
-                let mut set = self.find_reductions(gr[x.rule_index].head.clone());
-                set.insert(gr[x.rule_index].head.clone());
-                set
-            }).collect()
+            terminated_items
+                .flat_map(|x| {
+                    let mut set = self.find_reductions(gr[x.rule_index].head.clone());
+                    set.insert(gr[x.rule_index].head.clone());
+                    set
+                })
+                .collect()
         } else {
-            terminated_items.map(|x| gr[x.rule_index].head.clone()).collect()
+            terminated_items
+                .map(|x| gr[x.rule_index].head.clone())
+                .collect()
         };
 
         // For every finished symbol in R and every unfinished rule in Q
@@ -196,10 +205,18 @@ impl HarrisonParser {
         for terminated_item in terminated_symbols {
             for unfinished_item in q.iter().filter(|x| !is_final(&gr, x)) {
                 // Retrieve the token that is currently read
-                if let Some((token, term)) = &gr[unfinished_item.rule_index].body.get(unfinished_item.dot) {
+                if let Some((token, term)) =
+                    &gr[unfinished_item.rule_index].body.get(unfinished_item.dot)
+                {
                     // If the tokens match
                     if !*term && *token == terminated_item {
-                        result = result.union(&self.skip_epsilon(LR0Item::new(unfinished_item.rule_index, unfinished_item.dot + 1))).cloned().collect();
+                        result = result
+                            .union(&self.skip_epsilon(LR0Item::new(
+                                unfinished_item.rule_index,
+                                unfinished_item.dot + 1,
+                            )))
+                            .cloned()
+                            .collect();
                     }
                 }
             }
@@ -211,8 +228,10 @@ impl HarrisonParser {
     fn find_derivations(&mut self, symbol: String) -> HashSet<LR0Item> {
         //let mut result: HashSet<LR0Item> = HashSet::new();
 
-        //grammar.iter().filter(|x| 
-        let start = self.grammar.iter()
+        //grammar.iter().filter(|x|
+        let start = self
+            .grammar
+            .iter()
             .enumerate()
             .filter(|(_, x)| x.head == symbol)
             .map(|(i, _)| LR0Item::new(i, 0))
@@ -222,14 +241,30 @@ impl HarrisonParser {
 
         loop {
             let mut update = HashSet::new();
-            for (sym, term) in result.iter().flat_map(|x| self.grammar[x.rule_index].body.get(x.dot)) {
-                update = update.union(&self.grammar.iter().enumerate().filter(|(_, x)| x.head == *sym && !term)
-                    .map(|(i, _)| LR0Item::new(i, 0)).collect()).cloned().collect();
+            for (sym, term) in result
+                .iter()
+                .flat_map(|x| self.grammar[x.rule_index].body.get(x.dot))
+            {
+                update = update
+                    .union(
+                        &self
+                            .grammar
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, x)| x.head == *sym && !term)
+                            .map(|(i, _)| LR0Item::new(i, 0))
+                            .collect(),
+                    )
+                    .cloned()
+                    .collect();
             }
-            update = update.union(&self.complete(&result, &result, false)).cloned().collect();
-            
+            update = update
+                .union(&self.complete(&result, &result, false))
+                .cloned()
+                .collect();
+
             if update.is_subset(&result) {
-                break
+                break;
             } else {
                 result = result.union(&update).cloned().collect();
             }
@@ -238,7 +273,10 @@ impl HarrisonParser {
     }
 
     fn predict(&mut self, input: &HashSet<String>) -> HashSet<LR0Item> {
-        input.iter().flat_map(|x| self.find_derivations(x.clone())).collect()
+        input
+            .iter()
+            .flat_map(|x| self.find_derivations(x.clone()))
+            .collect()
     }
 
     fn scan(&mut self, previous: &HashSet<LR0Item>, word: &str) -> HashSet<LR0Item> {
@@ -247,7 +285,10 @@ impl HarrisonParser {
             let rule = &self.grammar[item.rule_index];
             if let Some((token, term)) = &rule.body.get(item.dot) {
                 if word == token && *term {
-                    result = result.union(&self.skip_epsilon(LR0Item::new(item.rule_index, item.dot + 1))).cloned().collect();
+                    result = result
+                        .union(&self.skip_epsilon(LR0Item::new(item.rule_index, item.dot + 1)))
+                        .cloned()
+                        .collect();
                 }
             }
         }
@@ -289,10 +330,13 @@ impl HarrisonParser {
             }
             println!("Ts: {:?}", ts);
 
-            t[j][j] = self.predict(&ts.iter()
-                .flat_map(|x| self.grammar[x.rule_index].body.get(x.dot))
-                .filter(|(_, term)| !*term)
-                .map(|(sym, _)| sym.clone()).collect());
+            t[j][j] = self.predict(
+                &ts.iter()
+                    .flat_map(|x| self.grammar[x.rule_index].body.get(x.dot))
+                    .filter(|(_, term)| !*term)
+                    .map(|(sym, _)| sym.clone())
+                    .collect(),
+            );
 
             debug!("predict: t[{}, {}] = {:?}", j, j, t[j][j]);
         }
@@ -307,7 +351,6 @@ impl HarrisonParser {
             .map(|(i, _)| LR0Item::new(i, self.grammar[i].body.len()))
             .any(|x| t[0][n].contains(&x))
     }
-
 }
 
 #[cfg(test)]
@@ -331,19 +374,37 @@ mod tests {
 
     #[test]
     fn test_harrison2() {
-        assert!(harrison_recognize("examples/harrison2.txt", &vec!["a", "+", "a", "*", "a"]));
-        assert!(!harrison_recognize("examples/harrison2.txt", &vec!["a", "+", "+"]));
+        assert!(harrison_recognize(
+            "examples/harrison2.txt",
+            &vec!["a", "+", "a", "*", "a"]
+        ));
+        assert!(!harrison_recognize(
+            "examples/harrison2.txt",
+            &vec!["a", "+", "+"]
+        ));
     }
 
     #[test]
     fn test_dyck1() {
-        assert!(harrison_recognize("examples/dyck1.txt", &vec!["(", "(", ")", ")"]));
-        assert!(!harrison_recognize("examples/dyck1.txt", &vec!["(", "(", "(", "("]));
+        assert!(harrison_recognize(
+            "examples/dyck1.txt",
+            &vec!["(", "(", ")", ")"]
+        ));
+        assert!(!harrison_recognize(
+            "examples/dyck1.txt",
+            &vec!["(", "(", "(", "("]
+        ));
     }
 
     #[test]
     fn test_even_zeros() {
-        assert!(harrison_recognize("examples/even_zeros.txt", &vec!["1", "0", "0", "1"]));
-        assert!(!harrison_recognize("examples/even_zeros.txt", &vec!["1", "1", "0", "1"]));
+        assert!(harrison_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "0", "0", "1"]
+        ));
+        assert!(!harrison_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "0", "1"]
+        ));
     }
 }

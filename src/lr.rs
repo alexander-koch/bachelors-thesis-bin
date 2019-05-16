@@ -39,7 +39,7 @@ impl fmt::Display for Action {
         match *self {
             Action::Shift(s) => write!(f, "s{}", s),
             Action::Reduce(r) => write!(f, "r{}", r),
-            Action::Acc => write!(f, "acc")
+            Action::Acc => write!(f, "acc"),
         }
     }
 }
@@ -74,7 +74,6 @@ impl LRParser for FFSets {
 
                 // Get the current non-terminal we are looking at
                 if let Some(current) = rule.body.get(item.dot).filter(|x| !x.1).map(|x| &x.0) {
-
                     // Get all follow-up tokens
                     let mut tokens = rule.body[item.dot + 1..].to_vec();
                     tokens.push((a.clone(), true));
@@ -196,15 +195,23 @@ impl LRParser for FFSets {
 
         for (i, action, sym) in actions {
             match action_table[i].entry(sym.clone()) {
-                Entry::Occupied(o) => panic!("LR shift/reduce conflict {}:{} = {}/{}", i, sym, o.get(), action),
-                Entry::Vacant(v) => v.insert(action)
+                Entry::Occupied(o) => panic!(
+                    "LR shift/reduce conflict {}:{} = {}/{}",
+                    i,
+                    sym,
+                    o.get(),
+                    action
+                ),
+                Entry::Vacant(v) => v.insert(action),
             };
         }
 
         for (i, action, sym) in gotos {
             match goto_table[i].entry(sym.clone()) {
-                Entry::Occupied(o) => panic!("LR goto conflict {}:{} = {}/{}", i, sym, o.get(), action),
-                Entry::Vacant(v) => v.insert(action)
+                Entry::Occupied(o) => {
+                    panic!("LR goto conflict {}:{} = {}/{}", i, sym, o.get(), action)
+                }
+                Entry::Vacant(v) => v.insert(action),
             };
         }
 
