@@ -79,6 +79,31 @@ impl fmt::Display for Rule {
     }
 }
 
+#[derive(Debug)]
+pub enum GrammarError {
+    IOError(io::Error),
+    LexisError(Error),
+    SyntaxError(Error),
+    SemanticError(String),
+}
+
+impl From<io::Error> for GrammarError {
+    fn from(err: io::Error) -> GrammarError {
+        GrammarError::IOError(err)
+    }
+}
+
+impl fmt::Display for GrammarError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            GrammarError::IOError(e) => write!(f, "IO error: {}", e),
+            GrammarError::LexisError(e) => write!(f, "Lexical error: {}", e),
+            GrammarError::SyntaxError(e) => write!(f, "Syntax error: {}", e),
+            GrammarError::SemanticError(e) => write!(f, "Semantic error: {}", e)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Grammar {
     pub nonterminals: HashSet<String>,
@@ -87,15 +112,30 @@ pub struct Grammar {
 }
 
 impl Grammar {
-    pub fn new(rules: Vec<Rule>) -> Grammar {
-        Grammar {
-            nonterminals: rules.iter().map(|x| x.head.clone()).collect(),
-            terminals: rules
-                .iter()
-                .flat_map(|x| x.body.iter().filter(|(_, t)| *t).map(|(x, _)| x.clone()))
-                .collect(),
-            rules: rules,
+    pub fn from_rules(rules: Vec<Rule>) -> Result<Grammar, GrammarError> {
+        // Collect non-terminals
+        let nonterminals: HashSet<_> = rules.iter().map(|x| x.head.clone()).collect();
+        let mut terminals = HashSet::new();
+
+        // While collecting the terminals
+        // find every non-terminal that is used but not defined
+        for rule in rules.iter() {
+            for (symbol, term) in rule.body.iter() {
+                if *term {
+                    terminals.insert(symbol.clone());
+                } else {
+                    if !nonterminals.contains(symbol) {
+                        return Err(GrammarError::SemanticError(format!("undefined symbol '{}' is used in rule '{}'", symbol, rule)));
+                    }
+                }
+            }
         }
+
+        Ok(Grammar {
+            nonterminals: nonterminals,
+            terminals: terminals,
+            rules: rules,
+        })
     }
 
     pub fn get_symbols(&self) -> HashSet<String> {
@@ -124,8 +164,7 @@ impl Index<usize> for Grammar {
     }
 }
 
-// pub type Grammar = Vec<Rule>;
-pub type ParsingResult<T> = ::std::result::Result<T, Error>;
+pub type ParsingResult<T> = ::std::result::Result<T, GrammarError>;
 
 /// Parser for the extended Backus-Naur form (EBNF)
 pub struct EBNFParser<T: Iterator<Item = Token>> {
@@ -152,11 +191,11 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     ///
     /// # Arguments
     /// * `message` - Error message do display
-    fn err(&self, message: String) -> Error {
-        Error {
+    fn err(&self, message: String) -> GrammarError {
+        GrammarError::SyntaxError(Error {
             message: message,
             position: self.current.position,
-        }
+        })
     }
 
     /// 'Bumps' the parser to read the next token.
@@ -171,12 +210,12 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
 
     /// If the current token contains a string value it is returned.
     /// Otherwise an empty string is returned.
-    fn get_current_value(&self) -> Result<String, Error> {
+    fn get_current_value(&self) -> Result<String, GrammarError> {
         self.current
             .value
             .as_ref()
             .map(|x| x.to_owned())
-            .ok_or(self.err("Trying to unwrap a reserved token".to_owned()))
+            .ok_or(self.err("trying to unwrap a reserved token".to_owned()))
     }
 
     fn expect_type(&mut self, t: TokenType) -> ParsingResult<()> {
@@ -185,7 +224,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
             Ok(())
         } else {
             Err(self.err(format!(
-                "Unexpected token `{:?}`, expected: `{:?}`",
+                "unexpected token '{:?}', expected '{:?}'",
                 self.current.typ, t
             )))
         }
@@ -214,7 +253,7 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                     body.clear()
                 }
                 TokenType::Dot => break,
-                _ => return Err(self.err("Invalid token".to_owned())),
+                _ => return Err(self.err("invalid token".to_owned())),
             }
 
             self.bump()
@@ -242,32 +281,14 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     pub fn parse(&mut self) -> ParsingResult<Grammar> {
         let rules = self.parse_rules()?;
         self.expect_type(TokenType::Eof)?;
-        Ok(Grammar::new(rules))
+        Grammar::from_rules(rules)
     }
 }
 
-#[derive(Debug)]
-pub enum ParseError {
-    IOError(io::Error),
-    LexisError(Error),
-}
-
-impl From<io::Error> for ParseError {
-    fn from(err: io::Error) -> ParseError {
-        ParseError::IOError(err)
-    }
-}
-
-impl From<Error> for ParseError {
-    fn from(err: Error) -> ParseError {
-        ParseError::LexisError(err)
-    }
-}
-
-pub fn parse_grammar(path: &str) -> Result<Grammar, ParseError> {
+pub fn parse_grammar(path: &str) -> Result<Grammar, GrammarError> {
     let content = fs::read_to_string(path)?;
     let mut lexer = Lexer::new(&content);
-    let tokens = lexer.run()?;
+    let tokens = lexer.run().map_err(|x| GrammarError::LexisError(x))?;
 
     for token in tokens.clone() {
         debug!("{}", token);

@@ -135,7 +135,10 @@ fn main() {
     let grammar_path = matches.value_of("grammar").unwrap();
     let grammar = match ebnf::parse_grammar(&grammar_path) {
         Ok(x) => Rc::new(x),
-        Err(x) => panic!("{:?}", x),
+        Err(x) => {
+            println!("{}", x);
+            std::process::exit(1);
+        }
     };
 
     for (i, rule) in grammar.iter().enumerate() {

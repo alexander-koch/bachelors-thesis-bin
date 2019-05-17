@@ -29,7 +29,7 @@ impl Position {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.line, self.column)
+        write!(f, "line {}, column {}", self.line, self.column)
     }
 }
 
@@ -41,7 +41,7 @@ pub struct Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.position, self.message)
+        write!(f, "{} - {}", self.position, self.message)
     }
 }
 
@@ -160,14 +160,14 @@ impl<'a> Lexer<'a> {
         let position = self.position;
         let c = match self.current {
             Some(v) => v,
-            None => return Err(self.err("Reached end of file", position)),
+            None => return Err(self.err("reached end of file", position)),
         };
         self.consume();
 
         let kind = match c {
             '|' => TokenType::Alternative,
             '=' => TokenType::Assign,
-            _ => return Err(self.err("Unknown punctuation", position)),
+            _ => return Err(self.err("unknown punctuation", position)),
         };
 
         Ok(Token {
@@ -192,7 +192,7 @@ impl<'a> Lexer<'a> {
         }
 
         if self.current.is_none() {
-            return Err(self.err("Reached end of file, literal is not ending", self.position));
+            return Err(self.err("reached end of file, literal is not ending", self.position));
         }
 
         let s = (&self.data[start..self.cursor]).to_string();
@@ -243,7 +243,7 @@ impl<'a> Lexer<'a> {
         } else if self.is_ident() {
             self.scan_variable()
         } else {
-            Err(self.err("Invalid character", position))
+            Err(self.err("invalid character", position))
         }
     }
 
