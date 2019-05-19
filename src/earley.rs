@@ -122,30 +122,32 @@ impl EarleyParser {
 
     fn process_state_set(&mut self, states: HashSet<State>, word: &str) {
         trace!("process_state_set: {:?}", states);
-        let mut updates = HashSet::new();
+        let mut new_states = states;
+        while !new_states.is_empty() {
+            let mut updates = HashSet::new();
 
-        // Calculate the update set
-        for state in states.iter() {
-            if let Some(set) = self.process_state(state, word) {
-                updates = updates.union(&set).cloned().collect();
+            // Calculate the update set
+            for state in new_states.iter() {
+                if let Some(set) = self.process_state(state, word) {
+                    updates = updates.union(&set).cloned().collect();
+                }
             }
-        }
 
-        debug!("updates: {:?}", updates);
-        let required_updates = updates
-            .difference(&self.states[self.cursor])
-            .cloned()
-            .collect();
+            // Determine the new additions
+            debug!("updates: {:?}", updates);
+            let required_updates = updates
+                .difference(&self.states[self.cursor])
+                .cloned()
+                .collect();
 
-        // Update in original set
-        self.states[self.cursor] = self.states[self.cursor]
-            .union(&required_updates)
-            .cloned()
-            .collect();
+            // Update in original set
+            self.states[self.cursor] = self.states[self.cursor]
+                .union(&required_updates)
+                .cloned()
+                .collect();
 
-        // Perform next iteration
-        if !updates.is_empty() {
-            self.process_state_set(required_updates, word);
+            // Perform next iteration
+            new_states = required_updates;
         }
     }
 
