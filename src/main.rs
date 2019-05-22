@@ -3,6 +3,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::collections::HashSet;
 use std::rc::Rc;
+use log::debug;
 
 pub mod ebnf;
 pub mod lexer;
@@ -41,7 +42,7 @@ fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
     let result = match &mut ctx.engine {
         ParsingEngine::Earley(earley_parser) => {
             let states = earley_parser.as_mut().analyze(&words);
-            println!("{}", earley::fmt_state_set_list(grammar, &states));
+            debug!("{}", earley::fmt_state_set_list(grammar, &states));
 
             if let Some(ref output) = ctx.output {
                 let mut fb = sppf::ForestBuilder::new();

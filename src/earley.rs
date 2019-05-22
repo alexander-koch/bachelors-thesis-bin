@@ -217,6 +217,28 @@ pub fn fmt_tex_state_set_list(grammar: &Grammar, states: &StateSetList) -> Strin
         .join("\n&")
 }
 
+/*
+use crate::ebnf;
+
+trait Parseable<'a, T: Iterator<Item = &'a str>> {
+    fn from_path(path: &str) -> Self;
+    fn is_word(&mut self, words: T) -> bool;
+}
+
+impl<'a, T: Iterator<Item = &'a str>> Parseable<'a, T> for EarleyParser {
+    fn from_path(path: &str) -> EarleyParser {
+        let grammar = ebnf::parse_grammar(path);
+        assert!(grammar.is_ok());
+        let grammar = Rc::new(grammar.ok().unwrap());
+        EarleyParser::new(&grammar)
+    }
+
+    fn is_word(&mut self, words: T) -> bool {
+        let states = self.analyze(words); 
+        EarleyParser::accepts(&states, words)
+    }
+}*/
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,8 +255,14 @@ mod tests {
 
     #[test]
     fn test_harrison1() {
-        assert!(earley_recognize("examples/harrison.txt", &vec!["a"]));
-        assert!(!earley_recognize("examples/harrison.txt", &vec!["b"]));
+        assert!(earley_recognize(
+            "examples/harrison.txt",
+            &vec!["a"]
+        ));
+        assert!(!earley_recognize(
+            "examples/harrison.txt",
+            &vec!["b"]
+        ));
     }
 
     #[test]
@@ -270,6 +298,14 @@ mod tests {
         assert!(!earley_recognize(
             "examples/even_zeros.txt",
             &vec!["1", "1", "0", "1"]
+        ));
+        assert!(earley_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        ));
+        assert!(!earley_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"]
         ));
     }
 }

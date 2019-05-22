@@ -69,6 +69,7 @@ pub fn find_rule_reductions(ff: &mut FFSets, rule: &Rule) -> HashSet<String> {
 }
 
 pub type ReductionMap = HashMap<String, HashSet<String>>;
+pub type SymbolMapping = HashMap<String, HashSet<LR0Item>>;
 
 pub fn calculate_reductions(ff: &mut FFSets) -> ReductionMap {
     let mut mapping = HashMap::new();
@@ -90,6 +91,7 @@ pub fn calculate_reductions(ff: &mut FFSets) -> ReductionMap {
 pub struct HarrisonParser {
     grammar: Rc<Grammar>,
     ff: FFSets,
+    derivation_map: SymbolMapping,
     reduction_map: ReductionMap,
 }
 
@@ -97,11 +99,80 @@ impl HarrisonParser {
     pub fn new(grammar: &Rc<Grammar>) -> HarrisonParser {
         let mut ff = FFSets::new(grammar);
         let reduction_map = calculate_reductions(&mut ff);
-        HarrisonParser {
+
+        //println!("{:?}", ff);
+        // for symbol in ff.grammar.clone().nonterminals.iter() {
+        //     ff.first(symbol);
+        //     ff.follow(symbol);
+        // }
+
+        let mut parser = HarrisonParser {
             grammar: grammar.clone(),
             ff: ff,
-            reduction_map: reduction_map,
+            reduction_map: HashMap::new(),
+            derivation_map: HashMap::new()
+        };
+        parser.init(reduction_map);
+        parser
+    }
+
+    fn init(&mut self, reduction_map: ReductionMap) {
+        let gr = self.grammar.clone();
+        for v in gr.nonterminals.iter() {
+            let derivations = self.find_derivations(v);
+            self.derivation_map.entry(v.clone())
+                .and_modify(|x| *x = x.union(&derivations).cloned().collect())
+                .or_insert(derivations);
+
+            let reductions = self.find_reductions(&reduction_map, v);
+            self.reduction_map.entry(v.clone())
+                .and_modify(|x| *x = x.union(&reductions).cloned().collect())
+                .or_insert(reductions);
         }
+    }
+
+    fn find_derivations(&mut self, symbol: &str) -> HashSet<LR0Item> {
+        let start = self
+            .grammar
+            .iter()
+            .enumerate()
+            .filter(|(_, x)| x.head == symbol)
+            .map(|(i, _)| LR0Item::new(i, 0))
+            .collect::<HashSet<LR0Item>>();
+
+        let mut result = start;
+
+        loop {
+            let mut update = HashSet::new();
+            for (sym, term) in result
+                .iter()
+                .flat_map(|x| self.grammar[x.rule_index].body.get(x.dot))
+            {
+                update = update
+                    .union(
+                        &self
+                            .grammar
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, x)| x.head == *sym && !term)
+                            .map(|(i, _)| LR0Item::new(i, 0))
+                            .collect(),
+                    )
+                    .cloned()
+                    .collect();
+            }
+            update = update
+                .union(&self.complete(&result, &result, false))
+                .cloned()
+                .collect();
+
+            if update.is_subset(&result) {
+                break;
+            } else {
+                result = result.union(&update).cloned().collect();
+            }
+        }
+        result
     }
 
     /// Finds reductions for a given production name
@@ -109,16 +180,16 @@ impl HarrisonParser {
     /// # Arguments
     ///
     /// * `symbol` - Name of the production
-    fn find_reductions(&self, symbol: String) -> HashSet<String> {
+    fn find_reductions(&self, reduction_map: &ReductionMap, symbol: &str) -> HashSet<String> {
         let mut current = HashSet::new();
         let mut result = HashSet::new();
-        current.insert(symbol);
+        current.insert(symbol.to_owned());
 
         loop {
             let mut updates = HashSet::new();
 
             for sym in current {
-                if let Some(set) = self.reduction_map.get(&sym) {
+                if let Some(set) = reduction_map.get(&sym) {
                     updates = updates.union(&set).cloned().collect();
                 }
             }
@@ -188,7 +259,10 @@ impl HarrisonParser {
         let terminated_symbols: HashSet<String> = if chained {
             terminated_items
                 .flat_map(|x| {
-                    let mut set = self.find_reductions(gr[x.rule_index].head.clone());
+                    //let mut set = self.find_reductions(gr[x.rule_index].head.clone());
+                    let v = &gr[x.rule_index].head;
+
+                    let mut set: HashSet<String> = self.reduction_map.get(v).cloned().unwrap_or(HashSet::new());
                     set.insert(gr[x.rule_index].head.clone());
                     set
                 })
@@ -225,58 +299,11 @@ impl HarrisonParser {
         result
     }
 
-    fn find_derivations(&mut self, symbol: String) -> HashSet<LR0Item> {
-        //let mut result: HashSet<LR0Item> = HashSet::new();
-
-        //grammar.iter().filter(|x|
-        let start = self
-            .grammar
-            .iter()
-            .enumerate()
-            .filter(|(_, x)| x.head == symbol)
-            .map(|(i, _)| LR0Item::new(i, 0))
-            .collect::<HashSet<LR0Item>>();
-
-        let mut result = start;
-
-        loop {
-            let mut update = HashSet::new();
-            for (sym, term) in result
-                .iter()
-                .flat_map(|x| self.grammar[x.rule_index].body.get(x.dot))
-            {
-                update = update
-                    .union(
-                        &self
-                            .grammar
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, x)| x.head == *sym && !term)
-                            .map(|(i, _)| LR0Item::new(i, 0))
-                            .collect(),
-                    )
-                    .cloned()
-                    .collect();
-            }
-            update = update
-                .union(&self.complete(&result, &result, false))
-                .cloned()
-                .collect();
-
-            if update.is_subset(&result) {
-                break;
-            } else {
-                result = result.union(&update).cloned().collect();
-            }
-        }
-        result
-    }
-
     fn predict(&mut self, input: &HashSet<String>) -> HashSet<LR0Item> {
         input
             .iter()
-            .flat_map(|x| self.find_derivations(x.clone()))
-            .collect()
+            .fold(HashSet::new(), |acc, x| acc.union(self.derivation_map.get(x)
+                .unwrap_or(&HashSet::new())).cloned().collect())
     }
 
     fn scan(&mut self, previous: &HashSet<LR0Item>, word: &str) -> HashSet<LR0Item> {
@@ -301,7 +328,7 @@ impl HarrisonParser {
         let mut set = HashSet::new();
         set.insert(self.grammar[0].head.clone());
         t[0][0] = self.predict(&set);
-        println!("t[0][0] = {:?}", t[0][0]);
+        debug!("t[0][0] = {:?}", t[0][0]);
 
         for j in 1..(n + 1) {
             // Scan
@@ -328,7 +355,7 @@ impl HarrisonParser {
             for i in 0..j {
                 ts = ts.union(&t[i][j]).cloned().collect();
             }
-            println!("Ts: {:?}", ts);
+            debug!("Ts: {:?}", ts);
 
             t[j][j] = self.predict(
                 &ts.iter()
@@ -341,7 +368,7 @@ impl HarrisonParser {
             debug!("predict: t[{}, {}] = {:?}", j, j, t[j][j]);
         }
 
-        //println!("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
+        // !("{}", fmt_tex_lr0_matrix(grammar, t.clone()));
 
         let start_symbol = &self.grammar[0].head;
         self.grammar
@@ -405,6 +432,14 @@ mod tests {
         assert!(!harrison_recognize(
             "examples/even_zeros.txt",
             &vec!["1", "1", "0", "1"]
+        ));
+        assert!(harrison_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+        ));
+        assert!(!harrison_recognize(
+            "examples/even_zeros.txt",
+            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"]
         ));
     }
 }
