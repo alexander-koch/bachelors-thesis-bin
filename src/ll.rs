@@ -132,11 +132,9 @@ impl FFSets {
     }
 
     // For each production A -> alpha do
-    //   Add A -> alpha to M[A, alpha] for each terminal in FIRST(alpha)
+    //   add A -> alpha to M[A, alpha] for each terminal in FIRST(alpha)
     //   If eps in FIRST(alpha) then
-    //     Add A -> eps to M[A, b] for each terminal b in FOLLOW(A)
-    //     If $ is in FOLLOW(A) then
-    //       Add A -> alpha to M[A, $]
+    //     add each M[A, b] for each terminal b in FOLLOW(A)
     pub fn construct_ll_table(&mut self) -> LLTable {
         let mut table = HashMap::new();
 

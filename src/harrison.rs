@@ -91,44 +91,42 @@ pub fn calculate_reductions(ff: &mut FFSets) -> ReductionMap {
 pub struct HarrisonParser {
     grammar: Rc<Grammar>,
     ff: FFSets,
-    derivation_map: SymbolMapping,
-    reduction_map: ReductionMap,
+    derivation_map: Rc<SymbolMapping>,
+    reduction_map: Rc<ReductionMap>,
 }
 
 impl HarrisonParser {
     pub fn new(grammar: &Rc<Grammar>) -> HarrisonParser {
-        let mut ff = FFSets::new(grammar);
-        let reduction_map = calculate_reductions(&mut ff);
-
-        //println!("{:?}", ff);
-        // for symbol in ff.grammar.clone().nonterminals.iter() {
-        //     ff.first(symbol);
-        //     ff.follow(symbol);
-        // }
-
         let mut parser = HarrisonParser {
             grammar: grammar.clone(),
-            ff: ff,
-            reduction_map: HashMap::new(),
-            derivation_map: HashMap::new()
+            ff: FFSets::new(grammar),
+            reduction_map: Rc::new(HashMap::new()),
+            derivation_map: Rc::new(HashMap::new())
         };
-        parser.init(reduction_map);
+        parser.init();
         parser
     }
 
-    fn init(&mut self, reduction_map: ReductionMap) {
+    fn init(&mut self) {
+        let initial_reduction_map = calculate_reductions(&mut self.ff);
+        let mut derivation_map: HashMap<_, HashSet<LR0Item>> = HashMap::new();
+        let mut reduction_map: HashMap<_, HashSet<String>> = HashMap::new();
+
         let gr = self.grammar.clone();
         for v in gr.nonterminals.iter() {
             let derivations = self.find_derivations(v);
-            self.derivation_map.entry(v.clone())
+            derivation_map.entry(v.clone())
                 .and_modify(|x| *x = x.union(&derivations).cloned().collect())
                 .or_insert(derivations);
 
-            let reductions = self.find_reductions(&reduction_map, v);
-            self.reduction_map.entry(v.clone())
+            let reductions = self.find_reductions(&initial_reduction_map, v);
+            reduction_map.entry(v.clone())
                 .and_modify(|x| *x = x.union(&reductions).cloned().collect())
                 .or_insert(reductions);
         }
+
+        self.derivation_map = Rc::new(derivation_map);
+        self.reduction_map = Rc::new(reduction_map);
     }
 
     fn find_derivations(&mut self, symbol: &str) -> HashSet<LR0Item> {
@@ -214,7 +212,6 @@ impl HarrisonParser {
     fn skip_epsilon(&mut self, item: LR0Item) -> HashSet<LR0Item> {
         let max = self.grammar[item.rule_index].body.len();
         let mut result = HashSet::new();
-        result.insert(item.clone());
 
         for i in item.dot..max {
             if let Some((sym, term)) = self.grammar[item.rule_index].body.get(i) {
@@ -227,6 +224,7 @@ impl HarrisonParser {
                 break;
             }
         }
+        result.insert(item);
         result
     }
 
@@ -251,25 +249,27 @@ impl HarrisonParser {
     ) -> HashSet<LR0Item> {
         let mut result = HashSet::new();
         let gr = self.grammar.clone();
+        let rm = self.reduction_map.clone();
 
         // Find all finished rules A in R
         // If chained, then find everything that is derivable to A
         // Map to the production names
         let terminated_items = r.iter().filter(|x| is_final(&gr, x));
-        let terminated_symbols: HashSet<String> = if chained {
+        let terminated_symbols: HashSet<&str> = if chained {
             terminated_items
                 .flat_map(|x| {
                     //let mut set = self.find_reductions(gr[x.rule_index].head.clone());
                     let v = &gr[x.rule_index].head;
-
-                    let mut set: HashSet<String> = self.reduction_map.get(v).cloned().unwrap_or(HashSet::new());
-                    set.insert(gr[x.rule_index].head.clone());
+                    let mut set: HashSet<&str> = rm.get(v)
+                        .map(|x| x.iter().map(|y| y.as_str()).collect())
+                        .unwrap_or(HashSet::new());
+                    set.insert(gr[x.rule_index].head.as_str());
                     set
                 })
                 .collect()
         } else {
             terminated_items
-                .map(|x| gr[x.rule_index].head.clone())
+                .map(|x| gr[x.rule_index].head.as_str())
                 .collect()
         };
 
@@ -302,8 +302,13 @@ impl HarrisonParser {
     fn predict(&mut self, input: &HashSet<String>) -> HashSet<LR0Item> {
         input
             .iter()
-            .fold(HashSet::new(), |acc, x| acc.union(self.derivation_map.get(x)
-                .unwrap_or(&HashSet::new())).cloned().collect())
+            .fold(HashSet::new(), |acc, x| 
+                if let Some(entry) = self.derivation_map.get(x) {
+                    acc.union(entry).cloned().collect()
+                } else {
+                    acc
+                }
+            )
     }
 
     fn scan(&mut self, previous: &HashSet<LR0Item>, word: &str) -> HashSet<LR0Item> {
