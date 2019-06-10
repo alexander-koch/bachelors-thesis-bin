@@ -1,10 +1,10 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
-use std::collections::hash_map::Entry;
 
-use prettytable::{Table, Row, Cell};
-use prettytable::format;
 use crate::util::{format_row, ToPrettyTable};
+use prettytable::format;
+use prettytable::{Cell, Row, Table};
 
 use crate::ebnf::Grammar;
 
@@ -15,9 +15,11 @@ impl ToPrettyTable for LLTable {
         let mut table = Table::new();
         table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
 
-        let symbols: HashSet<String> = self.iter().fold(HashSet::new(), |acc, x|
+        let symbols: HashSet<String> = self.iter().fold(HashSet::new(), |acc, x| {
             acc.union(&x.1.iter().map(|y| y.0.clone()).collect::<HashSet<String>>())
-            .cloned().collect::<HashSet<String>>());
+                .cloned()
+                .collect::<HashSet<String>>()
+        });
 
         let indices: Vec<String> = symbols.into_iter().collect();
 
@@ -212,15 +214,15 @@ pub fn parse_ll(
     loop {
         //println!("Current word: {}, stack: {:?}", words[i], stack);
         if i >= words.len() {
-            return Err(())
+            return Err(());
         }
 
         if let Some((symbol, term)) = stack.last() {
             if *term {
                 if &words[i] != symbol {
-                    return Err(())
+                    return Err(());
                 } else if words[i] == "$" && *symbol == "$" {
-                    return Ok(steps)
+                    return Ok(steps);
                 } else {
                     stack.pop();
                     i += 1;
@@ -234,11 +236,11 @@ pub fn parse_ll(
                         stack.push((&symbol, *term));
                     }
                 } else {
-                    return Err(())
+                    return Err(());
                 }
             }
         } else {
-            return Err(())
+            return Err(());
         }
     }
 }

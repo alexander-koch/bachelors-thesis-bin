@@ -1,9 +1,9 @@
 use clap::{App, Arg};
+use log::debug;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::collections::HashSet;
 use std::rc::Rc;
-use log::debug;
 use std::time::Instant;
 
 pub mod ebnf;
@@ -45,8 +45,8 @@ fn eval_steps(grammar: &Grammar, steps: &Result<Vec<usize>, ()>) -> bool {
                 println!("Apply: ({}) {}", index, grammar[*index]);
             }
             true
-        },
-        Err(()) => false
+        }
+        Err(()) => false,
     }
 }
 
@@ -73,12 +73,16 @@ fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
             EarleyParser::accepts(&states, &words)
         }
         ParsingEngine::Harrison(harrison_parser) => harrison_parser.as_mut().accepts(&words),
-        ParsingEngine::LL1(ll_table) => eval_steps(grammar, &ll::parse_ll(grammar, ll_table.as_mut(), &words)),
-        ParsingEngine::LR1(lr_table) => eval_steps(grammar, &lr::parse_lr(&grammar, lr_table.as_mut(), &words))
+        ParsingEngine::LL1(ll_table) => {
+            eval_steps(grammar, &ll::parse_ll(grammar, ll_table.as_mut(), &words))
+        }
+        ParsingEngine::LR1(lr_table) => {
+            eval_steps(grammar, &lr::parse_lr(&grammar, lr_table.as_mut(), &words))
+        }
     };
 
     let duration = now.elapsed();
-    
+
     println!("w in L(G): {}", result);
     println!("Finished in {:?}", duration);
 }
@@ -199,7 +203,7 @@ fn main() {
         "lr1" => {
             let mut ff = ll::FFSets::new(&grammar);
             let table = ff.compute_states();
-    
+
             let prettytable = table.to_pretty_table();
             prettytable.printstd();
 

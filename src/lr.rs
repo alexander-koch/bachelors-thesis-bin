@@ -2,10 +2,10 @@ use crate::ebnf::Grammar;
 use crate::ll::FFSets;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use prettytable::format;
+use prettytable::{Cell, Row, Table};
 use std::collections::hash_map::Entry;
 use std::fmt;
-use prettytable::{Table, Row, Cell};
-use prettytable::format;
 
 use crate::util::{format_row, ToPrettyTable};
 
@@ -55,15 +55,18 @@ pub struct LRTable {
 impl ToPrettyTable for LRTable {
     fn to_pretty_table(&self) -> Table {
         // Collect table keys
-        let action_keys: HashSet<String> = self.action_table.iter()
-            .fold(HashSet::new(), |acc, x| 
+        let action_keys: HashSet<String> =
+            self.action_table.iter().fold(HashSet::new(), |acc, x| {
                 acc.union(&x.iter().map(|x| x.0.clone()).collect::<HashSet<String>>())
-                .cloned().collect::<HashSet<String>>());
+                    .cloned()
+                    .collect::<HashSet<String>>()
+            });
 
-        let goto_keys: HashSet<String> = self.goto_table.iter()
-            .fold(HashSet::new(), |acc, x| 
-                acc.union(&x.iter().map(|x| x.0.clone()).collect::<HashSet<String>>())
-                .cloned().collect::<HashSet<String>>());
+        let goto_keys: HashSet<String> = self.goto_table.iter().fold(HashSet::new(), |acc, x| {
+            acc.union(&x.iter().map(|x| x.0.clone()).collect::<HashSet<String>>())
+                .cloned()
+                .collect::<HashSet<String>>()
+        });
 
         let action_indices: Vec<String> = action_keys.into_iter().collect();
         let goto_indices: Vec<String> = goto_keys.into_iter().collect();
@@ -84,9 +87,12 @@ impl ToPrettyTable for LRTable {
 
         table.set_titles(Row::new(header));
 
-        for (idx, (x, y)) in self.action_table.iter()
-            .zip(self.goto_table.iter()).enumerate() {
-
+        for (idx, (x, y)) in self
+            .action_table
+            .iter()
+            .zip(self.goto_table.iter())
+            .enumerate()
+        {
             let x_row = format_row(&action_indices, x);
             let y_row = format_row(&goto_indices, y);
 
@@ -95,7 +101,6 @@ impl ToPrettyTable for LRTable {
             row.extend(y_row.into_iter());
 
             table.add_row(Row::new(row));
-
         }
         table
     }
@@ -270,7 +275,7 @@ impl LRParser for FFSets {
         //     println!("State {}: {:?}", i, state);
         // }
 
-       //println!("states: {:?}", qs);
+        //println!("states: {:?}", qs);
         // debug!("actions: {:?}", actions);
 
         // println!("action_table: {:?}", action_table);
@@ -292,9 +297,9 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> Result
 
     loop {
         if i >= words.len() {
-            return Err(())
+            return Err(());
         }
-        
+
         let word = words[i];
         let state = *stack.last().unwrap();
 
@@ -314,7 +319,7 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> Result
                 stack.push(table.goto_table[*stack.last().unwrap()][&rule.head]);
             }
             Some(Action::Acc) => return Ok(steps),
-            _ => return Err(())
+            _ => return Err(()),
         }
     }
 }

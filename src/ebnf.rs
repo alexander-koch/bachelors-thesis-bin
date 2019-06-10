@@ -99,7 +99,7 @@ impl fmt::Display for GrammarError {
             GrammarError::IOError(e) => write!(f, "IO error: {}", e),
             GrammarError::LexisError(e) => write!(f, "Lexical error: {}", e),
             GrammarError::SyntaxError(e) => write!(f, "Syntax error: {}", e),
-            GrammarError::SemanticError(e) => write!(f, "Semantic error: {}", e)
+            GrammarError::SemanticError(e) => write!(f, "Semantic error: {}", e),
         }
     }
 }
@@ -125,7 +125,10 @@ impl Grammar {
                     terminals.insert(symbol.clone());
                 } else {
                     if !nonterminals.contains(symbol) {
-                        return Err(GrammarError::SemanticError(format!("undefined symbol '{}' is used in rule '{}'", symbol, rule)));
+                        return Err(GrammarError::SemanticError(format!(
+                            "undefined symbol '{}' is used in rule '{}'",
+                            symbol, rule
+                        )));
                     }
                 }
             }

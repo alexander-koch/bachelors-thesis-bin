@@ -101,7 +101,7 @@ impl HarrisonParser {
             grammar: grammar.clone(),
             ff: FFSets::new(grammar),
             reduction_map: Rc::new(HashMap::new()),
-            derivation_map: Rc::new(HashMap::new())
+            derivation_map: Rc::new(HashMap::new()),
         };
         parser.init();
         parser
@@ -115,12 +115,14 @@ impl HarrisonParser {
         let gr = self.grammar.clone();
         for v in gr.nonterminals.iter() {
             let derivations = self.find_derivations(v);
-            derivation_map.entry(v.clone())
+            derivation_map
+                .entry(v.clone())
                 .and_modify(|x| *x = x.union(&derivations).cloned().collect())
                 .or_insert(derivations);
 
             let reductions = self.find_reductions(&initial_reduction_map, v);
-            reduction_map.entry(v.clone())
+            reduction_map
+                .entry(v.clone())
                 .and_modify(|x| *x = x.union(&reductions).cloned().collect())
                 .or_insert(reductions);
         }
@@ -260,7 +262,8 @@ impl HarrisonParser {
                 .flat_map(|x| {
                     //let mut set = self.find_reductions(gr[x.rule_index].head.clone());
                     let v = &gr[x.rule_index].head;
-                    let mut set: HashSet<&str> = rm.get(v)
+                    let mut set: HashSet<&str> = rm
+                        .get(v)
                         .map(|x| x.iter().map(|y| y.as_str()).collect())
                         .unwrap_or(HashSet::new());
                     set.insert(gr[x.rule_index].head.as_str());
@@ -300,15 +303,13 @@ impl HarrisonParser {
     }
 
     fn predict(&mut self, input: &HashSet<String>) -> HashSet<LR0Item> {
-        input
-            .iter()
-            .fold(HashSet::new(), |acc, x| 
-                if let Some(entry) = self.derivation_map.get(x) {
-                    acc.union(entry).cloned().collect()
-                } else {
-                    acc
-                }
-            )
+        input.iter().fold(HashSet::new(), |acc, x| {
+            if let Some(entry) = self.derivation_map.get(x) {
+                acc.union(entry).cloned().collect()
+            } else {
+                acc
+            }
+        })
     }
 
     fn scan(&mut self, previous: &HashSet<LR0Item>, word: &str) -> HashSet<LR0Item> {
@@ -440,11 +441,21 @@ mod tests {
         ));
         assert!(harrison_recognize(
             "examples/even_zeros.txt",
-            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"]
+            &vec![
+                "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
+                "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
+                "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
+                "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"
+            ]
         ));
         assert!(!harrison_recognize(
             "examples/even_zeros.txt",
-            &vec!["1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"]
+            &vec![
+                "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
+                "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
+                "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
+                "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"
+            ]
         ));
     }
 }
