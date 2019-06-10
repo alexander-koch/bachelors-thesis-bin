@@ -4,8 +4,10 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use std::collections::hash_map::Entry;
 use std::fmt;
+use prettytable::{Table, Row, Cell};
+use prettytable::format;
 
-use log::debug;
+use crate::util::{format_row, ToPrettyTable};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LR0Item {
@@ -48,6 +50,55 @@ impl fmt::Display for Action {
 pub struct LRTable {
     action_table: Vec<HashMap<String, Action>>,
     goto_table: Vec<HashMap<String, usize>>,
+}
+
+impl ToPrettyTable for LRTable {
+    fn to_pretty_table(&self) -> Table {
+        // Collect table keys
+        let action_keys: HashSet<String> = self.action_table.iter()
+            .fold(HashSet::new(), |acc, x| 
+                acc.union(&x.iter().map(|x| x.0.clone()).collect::<HashSet<String>>())
+                .cloned().collect::<HashSet<String>>());
+
+        let goto_keys: HashSet<String> = self.goto_table.iter()
+            .fold(HashSet::new(), |acc, x| 
+                acc.union(&x.iter().map(|x| x.0.clone()).collect::<HashSet<String>>())
+                .cloned().collect::<HashSet<String>>());
+
+        let action_indices: Vec<String> = action_keys.into_iter().collect();
+        let goto_indices: Vec<String> = goto_keys.into_iter().collect();
+
+        // let action_indices = action_keys.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect::<HashMap<String, usize>>();
+        // let goto_indices = goto_keys.iter().enumerate().map(|(i, x)| (x.clone(), i)).collect::<HashMap<String, usize>>();
+
+        // println!("{:?}", action_indices);
+
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+
+        let action_cells: Vec<Cell> = action_indices.iter().map(Cell::from).collect();
+        let goto_cells: Vec<Cell> = goto_indices.iter().map(Cell::from).collect();
+        let mut header = vec![Cell::new("")];
+        header.extend(action_cells.into_iter());
+        header.extend(goto_cells.into_iter());
+
+        table.set_titles(Row::new(header));
+
+        for (idx, (x, y)) in self.action_table.iter()
+            .zip(self.goto_table.iter()).enumerate() {
+
+            let x_row = format_row(&action_indices, x);
+            let y_row = format_row(&goto_indices, y);
+
+            let mut row = vec![Cell::new(&idx.to_string())];
+            row.extend(x_row.into_iter());
+            row.extend(y_row.into_iter());
+
+            table.add_row(Row::new(row));
+
+        }
+        table
+    }
 }
 
 pub trait LRParser {
@@ -215,11 +266,15 @@ impl LRParser for FFSets {
             };
         }
 
-        // debug!("states: {:?}", qs);
+        // for (i, state) in qs.iter().enumerate() {
+        //     println!("State {}: {:?}", i, state);
+        // }
+
+       //println!("states: {:?}", qs);
         // debug!("actions: {:?}", actions);
 
-        println!("action_table: {:?}", action_table);
-        println!("goto_table: {:?}", goto_table);
+        // println!("action_table: {:?}", action_table);
+        // println!("goto_table: {:?}", goto_table);
 
         LRTable {
             action_table: action_table,
@@ -228,13 +283,18 @@ impl LRParser for FFSets {
     }
 }
 
-pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
+pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> Result<Vec<usize>, ()> {
+    let mut steps = Vec::new();
     let mut stack = vec![0];
     let mut i = 0;
     let mut words = input.clone();
     words.push("$");
 
     loop {
+        if i >= words.len() {
+            return Err(())
+        }
+        
         let word = words[i];
         let state = *stack.last().unwrap();
 
@@ -242,22 +302,19 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> bool {
 
         match table.action_table[state].get(word) {
             Some(Action::Shift(s)) => {
-                debug!("Shift");
                 stack.push(*s);
                 i += 1;
             }
             Some(Action::Reduce(i)) => {
-                debug!("Reduce");
+                steps.push(*i);
                 let k = grammar[*i].body.len();
                 stack.truncate(stack.len() - k);
 
                 let rule = &grammar[*i];
-                println!("Apply: ({}) {}", *i, rule);
-
                 stack.push(table.goto_table[*stack.last().unwrap()][&rule.head]);
             }
-            Some(Action::Acc) => return true,
-            _ => return false,
+            Some(Action::Acc) => return Ok(steps),
+            _ => return Err(())
         }
     }
 }

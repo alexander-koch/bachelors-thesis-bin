@@ -1,6 +1,6 @@
 [package]
 name = "thesis_bin"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["Alexander Koch <kochalexander@gmx.net>"]
 edition = "2018"
 
@@ -9,3 +9,4 @@ log = "0.4"
 env_logger = "0.6"
 rustyline = "3.0"
 clap = "2.33"
+prettytable-rs = "^0.8"
