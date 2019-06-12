@@ -1,0 +1,8 @@
+S' = S .
+S = NP VP .
+NP = PN N | NP RC .
+VP = V NP .
+RC = NP V .
+PN = "Buffalo" .
+N = "buffalo" .
+V = "buffalo" .

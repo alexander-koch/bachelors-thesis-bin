@@ -255,18 +255,18 @@ mod tests {
 
     #[test]
     fn test_harrison1() {
-        assert!(earley_recognize("examples/harrison.txt", &vec!["a"]));
-        assert!(!earley_recognize("examples/harrison.txt", &vec!["b"]));
+        assert!(earley_recognize("grammars/ll1/harrison1.txt", &vec!["a"]));
+        assert!(!earley_recognize("grammars/ll1/harrison1.txt", &vec!["b"]));
     }
 
     #[test]
-    fn test_harrison2() {
+    fn test_arith_full_rec() {
         assert!(earley_recognize(
-            "examples/harrison2.txt",
+            "grammars/cfg/arith_full_rec.txt",
             &vec!["a", "+", "a", "*", "a"]
         ));
         assert!(!earley_recognize(
-            "examples/harrison2.txt",
+            "grammars/cfg/arith_full_rec.txt",
             &vec!["a", "+", "+"]
         ));
     }
@@ -274,11 +274,11 @@ mod tests {
     #[test]
     fn test_dyck1() {
         assert!(earley_recognize(
-            "examples/dyck1.txt",
+            "grammars/cfg/dyck1.txt",
             &vec!["(", "(", ")", ")"]
         ));
         assert!(!earley_recognize(
-            "examples/dyck1.txt",
+            "grammars/cfg/dyck1.txt",
             &vec!["(", "(", "(", "("]
         ));
     }
@@ -286,15 +286,15 @@ mod tests {
     #[test]
     fn test_even_zeros() {
         assert!(earley_recognize(
-            "examples/even_zeros.txt",
+            "grammars/ll1/even_zeros.txt",
             &vec!["1", "0", "0", "1"]
         ));
         assert!(!earley_recognize(
-            "examples/even_zeros.txt",
+            "grammars/ll1/even_zeros.txt",
             &vec!["1", "1", "0", "1"]
         ));
         assert!(earley_recognize(
-            "examples/even_zeros.txt",
+            "grammars/ll1/even_zeros.txt",
             &vec![
                 "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
                 "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
@@ -303,7 +303,7 @@ mod tests {
             ]
         ));
         assert!(!earley_recognize(
-            "examples/even_zeros.txt",
+            "grammars/ll1/even_zeros.txt",
             &vec![
                 "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
                 "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",

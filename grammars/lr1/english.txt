@@ -1,0 +1,27 @@
+S' = S .
+S = NP VP
+  | Aux NP VP
+  .
+
+NP = Pronoun
+   | ProperNoun
+   | Det Nominal
+   .
+
+Nominal = Nominal Noun | Noun .
+
+VP = Verb
+   | Verb NP
+   | Verb NP PP
+   | Verb PP
+   .
+   
+PP = Preposition NP .
+
+Aux = "does" .
+Noun = "flight" | "breeze" | "trip" | "morning" .
+Verb = "is" | "prefer" | "like" | "want" | "need" | "fly" .
+Pronoun = "me" | "I" | "you" | "it" .
+ProperNoun = "Boston" | "Los" "Angeles" .
+Det = "the" | "a" | "an" | "this" | "these" | "that" .
+Preposition = "from" | "near" | "to" | "on" .

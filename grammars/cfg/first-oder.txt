@@ -1,0 +1,23 @@
+S = Formula . 
+Formula = PrimitiveFormula
+        | "not" Formula
+        | Formula Connective Formula
+        | Quantifier Variable Formula
+        .
+
+PrimitiveFormula = Predicate "(" TermList ")" .
+TermList = Term "," TermList
+         | Term
+         .
+Term = Constant
+     | Variable
+     .
+
+Connective = "->" | "and" | "or" | "<->" | "=" .
+Quantifier = "forall" | "exists" .
+Constant = "c" Digit .
+Variable = "x" Digit .
+
+Predicate = "R" | "P" | "Q" .
+
+Digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .
