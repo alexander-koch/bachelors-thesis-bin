@@ -1,6 +1,7 @@
 //! Lexical analysis.
 
 use std::fmt;
+use crate::util;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TokenType {
@@ -10,6 +11,12 @@ pub enum TokenType {
     Alternative,
     Assign,
     Dot,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
+    LBrace,
+    RBrace
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -150,7 +157,7 @@ impl<'a> Lexer<'a> {
     fn is_punctuation(&mut self) -> bool {
         self.current
             .map(|c| match c {
-                '|' | '=' => true,
+                '|' | '=' | '.' | '(' | ')' | '[' | ']' | '{' | '}' => true,
                 _ => false,
             })
             .unwrap_or(false)
@@ -167,6 +174,13 @@ impl<'a> Lexer<'a> {
         let kind = match c {
             '|' => TokenType::Alternative,
             '=' => TokenType::Assign,
+            '.' => TokenType::Dot,
+            '(' => TokenType::LParen,
+            ')' => TokenType::RParen,
+            '[' => TokenType::LBracket,
+            ']' => TokenType::RBracket,
+            '{' => TokenType::LBrace,
+            '}' => TokenType::RBrace,
             _ => return Err(self.err("unknown punctuation", position)),
         };
 
@@ -183,19 +197,27 @@ impl<'a> Lexer<'a> {
 
         // Begin scanning
         let start = self.cursor;
+        let mut escaped = false;
+
         while let Some(c) = self.current {
-            if c == '"' {
+            if c == '"' && !escaped {
                 break;
-            } else {
-                self.consume();
             }
+            
+            if c == '\\' {
+                escaped = true;
+            } else {
+                escaped = false;
+            }
+
+            self.consume();  
         }
 
         if self.current.is_none() {
             return Err(self.err("reached end of file, literal is not ending", self.position));
         }
 
-        let s = (&self.data[start..self.cursor]).to_string();
+        let s = util::unescape(&self.data[start..self.cursor]);
         self.consume();
         Ok(Token {
             typ: TokenType::Literal,
@@ -226,14 +248,7 @@ impl<'a> Lexer<'a> {
 
     fn next_token(&mut self) -> LexicalResult<Token> {
         let position = self.position;
-        if self.curr_is('.') {
-            self.consume();
-            Ok(Token {
-                typ: TokenType::Dot,
-                value: None,
-                position: position,
-            })
-        } else if self.is_space() {
+        if self.is_space() {
             self.skip_space();
             self.next_token()
         } else if self.curr_is('"') {

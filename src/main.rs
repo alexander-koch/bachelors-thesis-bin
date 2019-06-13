@@ -58,7 +58,7 @@ fn check_word(grammar: &Grammar, ctx: &mut ParsingContext, word: &str) {
     let result = match &mut ctx.engine {
         ParsingEngine::Earley(earley_parser) => {
             let states = earley_parser.as_mut().analyze(&words);
-            //println!("{}", earley::fmt_tex_state_set_list(grammar, &states));
+            //println!("{}", earley::fmt_state_set_list(grammar, &states));
 
             if let Some(ref output) = ctx.output {
                 let mut fb = sppf::ForestBuilder::new();
