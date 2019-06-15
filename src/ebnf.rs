@@ -187,17 +187,10 @@ impl ASTCollector {
     }
 
     fn visit_rule(&mut self, rule: &ASTRule) -> Vec<Rule> {
-        if let Some(expr) = &rule.expr {
-            self.visit_expr(&expr).iter().map(|x| Rule {
-                    head: rule.name.clone(),
-                    body: x.clone()
-            }).collect()
-        } else {
-            vec![Rule {
+        self.visit_expr(&rule.expr).iter().map(|x| Rule {
                 head: rule.name.clone(),
-                body: Vec::new()
-            }]
-        }
+                body: x.clone()
+        }).collect()   
     }
 
     pub fn visit_grammar(&mut self, grammar: &ASTGrammar) -> Vec<Rule> {
@@ -227,7 +220,7 @@ pub type ASTExpr = Vec<ASTAlternative>;
 #[derive(Debug, Clone)]
 pub struct ASTRule {
     pub name: String,
-    pub expr: Option<ASTExpr>
+    pub expr: ASTExpr
 }
 
 pub type ASTGrammar = Vec<ASTRule>;
@@ -434,18 +427,14 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
         Ok(alts)
     }
 
-    /// Rule = VARIABLE "=" [ Expr ] "." .
+    /// Rule = VARIABLE "=" Expr "." .
     fn parse_rule(&mut self) -> ParsingResult<ASTRule> {
         trace!("parse_rule");
         let name = self.get_current_value()?;
         self.expect_type(TokenType::Variable)?;
         self.expect_type(TokenType::Assign)?;
 
-        let expr = if self.current.typ == TokenType::Dot {
-            None
-        } else {
-            Some(self.parse_expr()?)
-        };
+        let expr = self.parse_expr()?;
         self.expect_type(TokenType::Dot)?;
 
         Ok(ASTRule {
@@ -455,7 +444,8 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     }
 
     /// Grammar = Rule { Rule } 
-    fn parse_rules(&mut self) -> ParsingResult<ASTGrammar> {
+    fn parse_grammar(&mut self) -> ParsingResult<ASTGrammar> {
+        trace!("parse_grammar");
         let mut rules = Vec::new();
         while self.current.typ == TokenType::Variable {
             rules.push(self.parse_rule()?);
@@ -464,9 +454,9 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
     }
 
     pub fn parse(&mut self) -> ParsingResult<ASTGrammar> {
-        let rules = self.parse_rules()?;
+        let grammar = self.parse_grammar()?;
         self.expect_type(TokenType::Eof)?;
-        Ok(rules)
+        Ok(grammar)
     }
 }
 
