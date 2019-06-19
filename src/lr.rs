@@ -406,4 +406,14 @@ mod tests {
         assert!(!parse_lr(&grammar, &table, &vec!["is", "this", "it"]).is_ok());
     }
 
+    #[test]
+    fn test_dyck1() {
+        let grammar = ebnf::parse_grammar("grammars/cfg/dyck1.txt");
+        assert!(grammar.is_ok());
+        let grammar = Rc::new(grammar.ok().unwrap());
+        let mut ff = FFSets::new(&grammar);
+        let table = ff.compute_states();
+        assert!(!table.is_ok());
+    }
+
 }
