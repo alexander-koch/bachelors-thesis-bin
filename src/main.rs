@@ -192,7 +192,13 @@ fn main() {
         "harrison" => ParsingEngine::Harrison(Box::new(HarrisonParser::new(&grammar))),
         "ll1" => {
             let mut ff = ll::FFSets::new(&grammar);
-            let table = ff.construct_ll_table();
+            let table = match ff.construct_ll_table() {
+                Ok(x) => x,
+                Err(x) => {
+                    println!("{}", x);
+                    std::process::exit(1);
+                }
+            };
 
             let prettytable = table.to_pretty_table();
             prettytable.printstd();
@@ -201,7 +207,13 @@ fn main() {
         }
         "lr1" => {
             let mut ff = ll::FFSets::new(&grammar);
-            let table = ff.compute_states();
+            let table = match ff.compute_states() {
+                Ok(x) => x,
+                Err(x) => {
+                    println!("{}", x);
+                    std::process::exit(1);
+                }
+            };
 
             let prettytable = table.to_pretty_table();
             prettytable.printstd();

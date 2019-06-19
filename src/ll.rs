@@ -1,6 +1,8 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::fmt;
+use std::error;
 
 use crate::util::{format_row, ToPrettyTable};
 use prettytable::format;
@@ -36,6 +38,29 @@ impl ToPrettyTable for LLTable {
         }
 
         table
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LLTableError {
+    pub loc: (String, String),
+    pub found: usize,
+    pub expected: usize
+}
+
+impl fmt::Display for LLTableError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LL conflict {}[\"{}\"] = {}/{}", 
+            self.loc.0,
+            self.loc.1, 
+            self.found,
+            self.expected)
+    }
+}
+
+impl error::Error for LLTableError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
     }
 }
 
@@ -167,7 +192,7 @@ impl FFSets {
     //   add A -> alpha to M[A, alpha] for each terminal in FIRST(alpha)
     //   If eps in FIRST(alpha) then
     //     add each M[A, b] for each terminal b in FOLLOW(A)
-    pub fn construct_ll_table(&mut self) -> LLTable {
+    pub fn construct_ll_table(&mut self) -> Result<LLTable, LLTableError> {
         let mut table = HashMap::new();
 
         let gr = self.grammar.clone();
@@ -184,63 +209,119 @@ impl FFSets {
                     .or_insert_with(HashMap::new)
                     .entry(symbol.clone())
                 {
-                    Entry::Occupied(o) => panic!(
-                        "LL conflict, {}[\"{}\"] = {}/{}",
-                        rule.head,
-                        symbol,
-                        o.get(),
-                        i
-                    ),
+                    Entry::Occupied(o) => return Err(LLTableError {
+                        loc: (rule.head.clone(), symbol.clone()),
+                        found: *o.get(),
+                        expected: i
+                    }),
                     Entry::Vacant(v) => v.insert(i),
                 };
             }
         }
-        table
+        Ok(table)
     }
 }
 
 pub fn parse_ll(
     grammar: &Grammar,
-    table: &HashMap<String, HashMap<String, usize>>,
+    table: &LLTable,
     input: &Vec<&str>,
 ) -> Result<Vec<usize>, ()> {
     let mut stack = vec![("$", true), (&grammar[0].head, false)];
     let mut steps = Vec::new();
 
-    let mut words = input.clone();
-    words.push("$");
-
     let mut i = 0;
     loop {
+        let word: &str = input.get(i).unwrap_or(&"$");
+        let (symbol, term) = stack.last().ok_or(())?;
         //println!("Current word: {}, stack: {:?}", words[i], stack);
-        if i >= words.len() {
-            return Err(());
-        }
 
-        if let Some((symbol, term)) = stack.last() {
-            if *term {
-                if &words[i] != symbol {
-                    return Err(());
-                } else if words[i] == "$" && *symbol == "$" {
-                    return Ok(steps);
-                } else {
-                    stack.pop();
-                    i += 1;
-                }
+        if *term {
+            if word != *symbol {
+                return Err(());
+            } else if word == "$" {
+                return Ok(steps);
             } else {
-                if let Some(index) = table.get(*symbol).and_then(|x| x.get(words[i])) {
-                    stack.pop();
-                    // println!("Apply: ({}) {}", *index, grammar[*index]);
-                    steps.push(*index);
-                    for (symbol, term) in grammar[*index].body.iter().rev() {
-                        stack.push((&symbol, *term));
-                    }
-                } else {
-                    return Err(());
-                }
+                stack.pop();
+                i += 1;
             }
         } else {
-            return Err(());
+            let index = table.get(*symbol).and_then(|x| x.get(word)).ok_or(())?;
+            stack.pop();
+            // println!("Apply: ({}) {}", *index, grammar[*index]);
+            steps.push(*index);
+            for (symbol, term) in grammar[*index].body.iter().rev() {
+                stack.push((&symbol, *term));
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ebnf;
+
+    fn construct_table(path: &str) -> (Rc<Grammar>, LLTable) {
+        let grammar = ebnf::parse_grammar(path);
+        assert!(grammar.is_ok());
+        let grammar = Rc::new(grammar.ok().unwrap());
+        let mut ff = FFSets::new(&grammar);
+        let table = ff.construct_ll_table();
+        assert!(table.is_ok());
+        (grammar, table.ok().unwrap())
+    }
+
+    #[test]
+    fn test_apple_john() {
+        let (grammar, table) = construct_table("grammars/ll1/applejohn.txt");
+
+        assert!(parse_ll(&grammar, &table, &vec!["the", "apple"]).is_ok());
+        assert!(parse_ll(&grammar, &table, &vec!["John"]).is_ok());
+        assert!(!parse_ll(&grammar, &table, &vec!["the", "John"]).is_ok());
+        assert!(!parse_ll(&grammar, &table, &vec!["the"]).is_ok());
+    }
+
+    #[test]
+    fn test_arith() {
+        let (grammar, table) = construct_table("grammars/ll1/arith.txt");
+
+        assert!(parse_ll(&grammar, &table, &vec!["a", "+", "a", "*", "a"]).is_ok());
+        assert!(parse_ll(&grammar, &table, &vec!["a", "*", "a", "+", "a"]).is_ok());
+        assert!(parse_ll(&grammar, &table, &vec!["(", "a", "+", "a", ")", "*", "a"]).is_ok());
+        assert!(!parse_ll(&grammar, &table, &vec!["(", ")"]).is_ok());
+        assert!(!parse_ll(&grammar, &table, &vec!["+", "a"]).is_ok());
+    }
+
+    #[test]
+    fn test_even_zeros() {
+        let (grammar, table) = construct_table("grammars/ll1/even_zeros.txt");
+    
+        assert!(parse_ll(&grammar, &table, &vec!["1", "0", "0", "1"]).is_ok());
+        assert!(!parse_ll(&grammar, &table, &vec!["1", "1", "0", "1"]).is_ok());
+
+        assert!(parse_ll(&grammar, &table, &vec![
+                "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
+                "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
+                "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
+                "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"
+            ]).is_ok());
+
+        assert!(!parse_ll(&grammar, &table, &vec![
+                "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
+                "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
+                "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
+                "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"
+            ]).is_ok());   
+    }
+
+    #[test]
+    fn test_lr() {
+        let grammar = ebnf::parse_grammar("grammars/lr1/lr.txt");
+        assert!(grammar.is_ok());
+        let grammar = Rc::new(grammar.ok().unwrap());
+        let mut ff = FFSets::new(&grammar);
+        let table = ff.construct_ll_table();
+        assert!(table.is_err());
     }
 }

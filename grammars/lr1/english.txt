@@ -19,9 +19,9 @@ VP = Verb
 PP = Preposition NP .
 
 Aux = "does" .
-Noun = "flight" | "breeze" | "trip" | "morning" .
+Noun = "flight" | "breeze" | "trip" | "morning" | "answer" .
 Verb = "is" | "prefer" | "like" | "want" | "need" | "fly" .
 Pronoun = "me" | "I" | "you" | "it" .
-ProperNoun = "Boston" | "Los" "Angeles" .
+ProperNoun = "Boston" | "Los" "Angeles" | "42" .
 Det = "the" | "a" | "an" | "this" | "these" | "that" .
 Preposition = "from" | "near" | "to" | "on" .
