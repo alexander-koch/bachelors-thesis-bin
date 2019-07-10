@@ -95,6 +95,6 @@ without installing it system-wide, use
 cargo run -- <parameters-for-bin>
 ```
 
-## Licence
+## License
 
 Copyright (c) Alexander Koch 2019
