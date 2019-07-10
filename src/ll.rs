@@ -1,8 +1,8 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::fmt;
 use std::error;
+use std::fmt;
+use std::rc::Rc;
 
 use crate::util::{format_row, ToPrettyTable};
 use prettytable::format;
@@ -45,16 +45,16 @@ impl ToPrettyTable for LLTable {
 pub struct LLTableError {
     pub loc: (String, String),
     pub found: usize,
-    pub expected: usize
+    pub expected: usize,
 }
 
 impl fmt::Display for LLTableError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LL conflict {}[\"{}\"] = {}/{}", 
-            self.loc.0,
-            self.loc.1, 
-            self.found,
-            self.expected)
+        write!(
+            f,
+            "LL conflict {}[\"{}\"] = {}/{}",
+            self.loc.0, self.loc.1, self.found, self.expected
+        )
     }
 }
 
@@ -209,11 +209,13 @@ impl FFSets {
                     .or_insert_with(HashMap::new)
                     .entry(symbol.clone())
                 {
-                    Entry::Occupied(o) => return Err(LLTableError {
-                        loc: (rule.head.clone(), symbol.clone()),
-                        found: *o.get(),
-                        expected: i
-                    }),
+                    Entry::Occupied(o) => {
+                        return Err(LLTableError {
+                            loc: (rule.head.clone(), symbol.clone()),
+                            found: *o.get(),
+                            expected: i,
+                        });
+                    }
                     Entry::Vacant(v) => v.insert(i),
                 };
             }
@@ -222,11 +224,7 @@ impl FFSets {
     }
 }
 
-pub fn parse_ll(
-    grammar: &Grammar,
-    table: &LLTable,
-    input: &Vec<&str>,
-) -> Result<Vec<usize>, ()> {
+pub fn parse_ll(grammar: &Grammar, table: &LLTable, input: &Vec<&str>) -> Result<Vec<usize>, ()> {
     let mut stack = vec![("$", true), (&grammar[0].head, false)];
     let mut steps = Vec::new();
 
@@ -296,23 +294,33 @@ mod tests {
     #[test]
     fn test_even_zeros() {
         let (grammar, table) = construct_table("grammars/ll1/even_zeros.txt");
-    
+
         assert!(parse_ll(&grammar, &table, &vec!["1", "0", "0", "1"]).is_ok());
         assert!(!parse_ll(&grammar, &table, &vec!["1", "1", "0", "1"]).is_ok());
 
-        assert!(parse_ll(&grammar, &table, &vec![
+        assert!(parse_ll(
+            &grammar,
+            &table,
+            &vec![
                 "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
                 "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
                 "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
                 "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "1"
-            ]).is_ok());
+            ]
+        )
+        .is_ok());
 
-        assert!(!parse_ll(&grammar, &table, &vec![
+        assert!(!parse_ll(
+            &grammar,
+            &table,
+            &vec![
                 "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0", "0", "1", "1",
                 "1", "1", "1", "1", "1", "0", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1",
                 "1", "1", "1", "1", "1", "1", "0", "1", "1", "1", "0", "1", "1", "1", "0", "1",
                 "1", "1", "1", "1", "0", "1", "1", "1", "1", "1", "1", "1", "1", "0"
-            ]).is_ok());   
+            ]
+        )
+        .is_ok());
     }
 
     #[test]

@@ -402,7 +402,10 @@ mod tests {
     #[test]
     fn test_harrison1() {
         assert!(harrison_recognize("grammars/ll1/harrison1.txt", &vec!["a"]));
-        assert!(!harrison_recognize("grammars/ll1/harrison1.txt", &vec!["b"]));
+        assert!(!harrison_recognize(
+            "grammars/ll1/harrison1.txt",
+            &vec!["b"]
+        ));
     }
 
     #[test]

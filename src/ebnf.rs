@@ -109,14 +109,14 @@ impl fmt::Display for GrammarError {
 #[derive(Debug, Clone)]
 pub struct ASTCollector {
     pub id: usize,
-    pub rules: Vec<Rule>
+    pub rules: Vec<Rule>,
 }
 
 impl ASTCollector {
     pub fn new() -> ASTCollector {
         ASTCollector {
             id: 0,
-            rules: Vec::new()
+            rules: Vec::new(),
         }
     }
 
@@ -131,13 +131,13 @@ impl ASTCollector {
         for alt in alts {
             let rule = Rule {
                 head: name.clone(),
-                body: alt
+                body: alt,
             };
             self.rules.push(rule);
         }
         name
     }
-    
+
     fn visit_term(&mut self, term: &ASTTerm) -> (String, bool) {
         match term {
             ASTTerm::Variable(x) => (x.clone(), false),
@@ -152,10 +152,10 @@ impl ASTCollector {
                 let id = self.push_rules(alts);
                 self.rules.push(Rule {
                     head: id.clone(),
-                    body: Vec::new()
+                    body: Vec::new(),
                 });
                 (id, false)
-            },
+            }
             ASTTerm::Repetition(x) => {
                 let alts = self.visit_expr(x);
                 let indirect_id = self.push_rules(alts);
@@ -163,11 +163,11 @@ impl ASTCollector {
 
                 self.rules.push(Rule {
                     head: direct_id.clone(),
-                    body: vec![(indirect_id, false), (direct_id.clone(), false)]
+                    body: vec![(indirect_id, false), (direct_id.clone(), false)],
                 });
                 self.rules.push(Rule {
                     head: direct_id.clone(),
-                    body: Vec::new()
+                    body: Vec::new(),
                 });
                 (direct_id, false)
             }
@@ -187,19 +187,20 @@ impl ASTCollector {
     }
 
     fn visit_rule(&mut self, rule: &ASTRule) -> Vec<Rule> {
-        self.visit_expr(&rule.expr).iter().map(|x| Rule {
+        self.visit_expr(&rule.expr)
+            .iter()
+            .map(|x| Rule {
                 head: rule.name.clone(),
-                body: x.clone()
-        }).collect()   
+                body: x.clone(),
+            })
+            .collect()
     }
 
     pub fn visit_grammar(&mut self, grammar: &ASTGrammar) -> Vec<Rule> {
         self.rules.clear();
 
-        let mut found_rules: Vec<Rule> = grammar.iter()
-            .flat_map(|x| self.visit_rule(&x))
-            .collect();
-        
+        let mut found_rules: Vec<Rule> = grammar.iter().flat_map(|x| self.visit_rule(&x)).collect();
+
         found_rules.extend(self.rules.iter().cloned());
         found_rules
     }
@@ -211,7 +212,7 @@ pub enum ASTTerm {
     Literal(String),
     Group(Box<ASTExpr>),
     Optional(Box<ASTExpr>),
-    Repetition(Box<ASTExpr>)
+    Repetition(Box<ASTExpr>),
 }
 
 pub type ASTAlternative = Vec<ASTTerm>;
@@ -220,7 +221,7 @@ pub type ASTExpr = Vec<ASTAlternative>;
 #[derive(Debug, Clone)]
 pub struct ASTRule {
     pub name: String,
-    pub expr: ASTExpr
+    pub expr: ASTExpr,
 }
 
 pub type ASTGrammar = Vec<ASTRule>;
@@ -370,31 +371,35 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
                 let value = self.get_current_value()?;
                 self.bump();
                 ASTTerm::Variable(value)
-            },
+            }
             TokenType::Literal => {
                 let value = self.get_current_value()?;
                 self.bump();
                 ASTTerm::Literal(value)
-            },
+            }
             TokenType::LParen => {
                 self.bump();
                 let expr = self.parse_expr()?;
                 self.expect_type(TokenType::RParen)?;
                 ASTTerm::Group(Box::new(expr))
-            },
+            }
             TokenType::LBracket => {
                 self.bump();
                 let expr = self.parse_expr()?;
                 self.expect_type(TokenType::RBracket)?;
                 ASTTerm::Optional(Box::new(expr))
-            },
+            }
             TokenType::LBrace => {
                 self.bump();
                 let expr = self.parse_expr()?;
                 self.expect_type(TokenType::RBrace)?;
                 ASTTerm::Repetition(Box::new(expr))
             }
-            _ => return Err(self.err("Invalid token, expected, VARIABLE, LITERAL, (, [ or {".to_owned()))
+            _ => {
+                return Err(
+                    self.err("Invalid token, expected, VARIABLE, LITERAL, (, [ or {".to_owned())
+                );
+            }
         })
     }
 
@@ -408,8 +413,8 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
             | TokenType::LParen
             | TokenType::LBracket
             | TokenType::LBrace => true,
-            _ => false
-        } { 
+            _ => false,
+        } {
             terms.push(self.parse_term()?);
         }
 
@@ -439,11 +444,11 @@ impl<T: Iterator<Item = Token>> EBNFParser<T> {
 
         Ok(ASTRule {
             name: name,
-            expr: expr
+            expr: expr,
         })
     }
 
-    /// Grammar = Rule { Rule } 
+    /// Grammar = Rule { Rule }
     fn parse_grammar(&mut self) -> ParsingResult<ASTGrammar> {
         trace!("parse_grammar");
         let mut rules = Vec::new();

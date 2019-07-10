@@ -5,5 +5,6 @@ S = ident ":=" ident "+" const
   | "loop" ident "do" S "end"
   .
 
-ident = "x" | "y" | "z" .
-const = "0" | "1" .
+ident = "x" const .
+const = digit { digit } .
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" .

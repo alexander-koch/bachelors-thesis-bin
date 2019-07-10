@@ -1,7 +1,7 @@
 //! Lexical analysis.
 
-use std::fmt;
 use crate::util;
+use std::fmt;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum TokenType {
@@ -16,7 +16,7 @@ pub enum TokenType {
     LBracket,
     RBracket,
     LBrace,
-    RBrace
+    RBrace,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -203,14 +203,14 @@ impl<'a> Lexer<'a> {
             if c == '"' && !escaped {
                 break;
             }
-            
+
             if c == '\\' {
                 escaped = true;
             } else {
                 escaped = false;
             }
 
-            self.consume();  
+            self.consume();
         }
 
         if self.current.is_none() {

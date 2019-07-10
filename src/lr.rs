@@ -5,8 +5,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use prettytable::format;
 use prettytable::{Cell, Row, Table};
 use std::collections::hash_map::Entry;
-use std::fmt;
 use std::error;
+use std::fmt;
 
 use crate::util::{format_row, ToPrettyTable};
 
@@ -110,14 +110,14 @@ impl ToPrettyTable for LRTable {
 #[derive(Debug, Clone)]
 pub enum LRTableErrorKind {
     ActionError(Action, Action),
-    GotoError(usize, usize)
+    GotoError(usize, usize),
 }
 
 impl fmt::Display for LRTableErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LRTableErrorKind::ActionError(x, y) => write!(f, "{}/{}", x, y),
-            LRTableErrorKind::GotoError(x, y) => write!(f, "{}/{}", x, y)
+            LRTableErrorKind::GotoError(x, y) => write!(f, "{}/{}", x, y),
         }
     }
 }
@@ -130,11 +130,15 @@ pub struct LRTableError {
 
 impl fmt::Display for LRTableError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let name = match self.kind { 
+        let name = match self.kind {
             LRTableErrorKind::ActionError(_, _) => "shift/reduce",
             LRTableErrorKind::GotoError(_, _) => "goto",
         };
-        write!(f, "LR {} conflict {}:{} = {}", name, self.loc.0, self.loc.1, self.kind)
+        write!(
+            f,
+            "LR {} conflict {}:{} = {}",
+            name, self.loc.0, self.loc.1, self.kind
+        )
     }
 }
 
@@ -289,20 +293,24 @@ impl LRParser for FFSets {
 
         for (i, action, sym) in actions {
             match action_table[i].entry(sym.clone()) {
-                Entry::Occupied(o) => return Err(LRTableError {
-                    loc: (i, sym),
-                    kind: LRTableErrorKind::ActionError(o.get().clone(), action)
-                }),
+                Entry::Occupied(o) => {
+                    return Err(LRTableError {
+                        loc: (i, sym),
+                        kind: LRTableErrorKind::ActionError(o.get().clone(), action),
+                    });
+                }
                 Entry::Vacant(v) => v.insert(action),
             };
         }
 
         for (i, action, sym) in gotos {
             match goto_table[i].entry(sym.clone()) {
-                Entry::Occupied(o) => return Err(LRTableError {
-                    loc: (i, sym),
-                    kind: LRTableErrorKind::GotoError(*o.get(), action)
-                }),
+                Entry::Occupied(o) => {
+                    return Err(LRTableError {
+                        loc: (i, sym),
+                        kind: LRTableErrorKind::GotoError(*o.get(), action),
+                    });
+                }
                 Entry::Vacant(v) => v.insert(action),
             };
         }
@@ -332,7 +340,9 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> Result
     loop {
         let word: &str = input.get(i).unwrap_or(&"$");
         let state: &usize = stack.last().ok_or(())?;
-        let entry: &Action = table.action_table.get(*state)
+        let entry: &Action = table
+            .action_table
+            .get(*state)
             .and_then(|x| x.get(word))
             .ok_or(())?;
 
@@ -348,10 +358,12 @@ pub fn parse_lr(grammar: &Grammar, table: &LRTable, input: &Vec<&str>) -> Result
                 stack.truncate(stack.len() - k);
 
                 let top_state: &usize = stack.last().ok_or(())?;
-                let new_entry: &usize = table.goto_table.get(*top_state)
+                let new_entry: &usize = table
+                    .goto_table
+                    .get(*top_state)
                     .and_then(|x| x.get(&rule.head))
                     .ok_or(())?;
-                
+
                 stack.push(*new_entry);
             }
             Action::Acc => return Ok(steps),
@@ -378,7 +390,7 @@ mod tests {
     #[test]
     fn test_lr() {
         let (grammar, table) = construct_table("grammars/lr1/lr.txt");
-    
+
         assert!(parse_lr(&grammar, &table, &vec!["a"]).is_ok());
         assert!(parse_lr(&grammar, &table, &vec!["a", "a"]).is_ok());
         assert!(parse_lr(&grammar, &table, &vec!["a", "a", "a"]).is_ok());
@@ -400,8 +412,13 @@ mod tests {
     #[test]
     fn test_english() {
         let (grammar, table) = construct_table("grammars/lr1/english.txt");
-    
-        assert!(parse_lr(&grammar, &table, &vec!["I", "prefer", "a", "morning", "flight"]).is_ok());
+
+        assert!(parse_lr(
+            &grammar,
+            &table,
+            &vec!["I", "prefer", "a", "morning", "flight"]
+        )
+        .is_ok());
         assert!(parse_lr(&grammar, &table, &vec!["the", "answer", "is", "42"]).is_ok());
         assert!(!parse_lr(&grammar, &table, &vec!["is", "this", "it"]).is_ok());
     }
