@@ -463,7 +463,7 @@ dependencies = [
 
 [[package]]
 name = "thesis_bin"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",

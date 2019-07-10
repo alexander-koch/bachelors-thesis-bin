@@ -44,6 +44,11 @@ Thus typing e.g. "aaa" may lead to different results than "a a a".
 +-----------+-----------------------------------------------------+
 ```
 
+For more information use
+```
+thesis_bin --help
+```
+
 ## Grammar files
 
 Grammar files contain production rules in extended Backus-Naur form (EBNF).
@@ -82,6 +87,12 @@ use the following command
 
 ```sh
 cargo test
+```
+
+If you want to run the program
+without installing it system-wide, use 
+```
+cargo run -- <parameters-for-bin>
 ```
 
 ## Licence
