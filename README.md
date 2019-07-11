@@ -6,7 +6,7 @@ Thesis title: Parsing algorithms for context-free languages
 
 Download and install Rust via the installer [rustup](https://rustup.rs).
 
-Set the Rust version to use to 1.33.0.
+Set the Rust version to use to `1.33.0`.
 ```sh
 rustup default 1.33.0
 ```
@@ -17,6 +17,8 @@ issue the following command:
 ```sh
 cargo install --path .
 ```
+
+(working directory should be `thesis_bin`)
 
 Afterwards, a REPL can be started, by executing the following command
 for a grammar file of your choice.
@@ -83,21 +85,21 @@ See the `grammars` folder for more examples.
 ## Local installation and testing
 
 To generate the debug-build,
-issue the following command.
+issue the following command:
 
 ```sh
 cargo build
 ```
 
 In order to run the unit tests
-use the following command
+use the following command:
 
 ```sh
 cargo test
 ```
 
 If you want to run the program
-without installing it system-wide, use 
+without installing it system-wide, use
 ```
 cargo run -- <parameters-for-bin>
 ```
