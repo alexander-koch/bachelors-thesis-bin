@@ -1,4 +1,4 @@
-# Bachelor's thesis supplementary binary
+# Bachelor's thesis binary
 
 Thesis title: Parsing algorithms for context-free languages
 
