@@ -4,6 +4,13 @@ Thesis title: Parsing algorithms for context-free languages
 
 ## Installation
 
+Download and install Rust via the installer [rustup](https://rustup.rs).
+
+Set the Rust version to use to 1.33.0.
+```sh
+rustup default 1.33.0
+```
+
 To install the binary system-wide,
 issue the following command:
 
@@ -94,6 +101,19 @@ without installing it system-wide, use
 ```
 cargo run -- <parameters-for-bin>
 ```
+
+## Test system application versions
+
+```
+rustup 1.18.3
+rustc 1.33.0
+cargo 1.33.0
+```
+
+If you have a newer version installed,
+please revert to 1.33.0 with
+
+`rustup default 1.33.0`
 
 ## License
 
