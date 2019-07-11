@@ -104,6 +104,8 @@ cargo run -- <parameters-for-bin>
 
 ## Test system application versions
 
+Tested on macOS Mojave, Ubuntu 18.10
+
 ```
 rustup 1.18.3
 rustc 1.33.0
