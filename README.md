@@ -6,7 +6,7 @@ Thesis title: Parsing algorithms for context-free languages
 
 Download and install Rust via the installer [rustup](https://rustup.rs).
 
-Set the Rust version to use to `1.33.0`.
+Set the Rust version to `1.33.0`.
 ```sh
 rustup default 1.33.0
 ```
